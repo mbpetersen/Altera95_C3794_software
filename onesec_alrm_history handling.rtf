@@ -1,0 +1,175 @@
+{\rtf1\ansi\ansicpg1252\deff0\deflang1033{\fonttbl{\f0\fnil Courier New;}{\f1\fnil\fcharset0 Calibri;}}
+{\colortbl ;\red0\green0\blue0;\red63\green127\blue95;}
+{\*\generator Msftedit 5.41.21.2510;}\viewkind4\uc1\pard\sa200\sl276\slmult1\cf1\lang9\f0\fs20\tab\cf2 /*\cf0\par
+\cf2\tab //_________________________________________________________\cf0\par
+\cf2\tab // C37.94 One_sec processing\cf0\par
+\cf2\tab //_________________________________________________________\cf0\par
+\cf2   \tab\ul //*** C37.94 One Second Elapsed Timer   ********************\cf0\ulnone\par
+\cf2\tab\ul tmplong\ulnone  = BytesToLong(ConfigStatC37,C37SECONDS3_ptr); // get and INC ET SECONDS\cf0\par
+\cf2\tab\ul tmplong\ulnone ++;\cf0\par
+\cf2\tab SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,\ul tmplong\ulnone );\cf0\par
+\cf2   \tab\ul //**********************************************************\cf0\ulnone\par
+\par
+\cf2\tab if(ERRORS_LED == LED_ON)\tab // if we had an error previously then turn it off\cf0\par
+\cf2\tab\tab ERRORS_LED = LED_OFF;\cf0\par
+\par
+\cf2\tab\ul //***************************************************************\cf0\ulnone\par
+\cf2\tab\ul //*** Handle the ALARM counters (inc'd real-time in the intr) ***\cf0\ulnone\par
+\cf2\tab\ul //***************************************************************\cf0\ulnone\par
+\cf2\tab SaveBytesInt(ConfigStatC37,LOS_COUNT1_ptr,LOSCNT); // Save all CNTs into Status array\cf0\par
+\par
+\cf2\tab if(InLOS)\{                    // We have LOS so...\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,LOS_SEC1_ptr); \tab // get current CNT\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab\tab\tab // Inc LOS-seconds CNT\cf0\par
+\cf2\tab\tab SaveBytesInt(ConfigStatC37,LOS_SEC1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab ERRORS_LED = LED_ON;\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_ON;\cf0\par
+\cf2\tab\tab\tab History = YES;\cf0\par
+\cf2\tab\tab\}\cf0\par
+\cf2\tab SaveBytesInt(ConfigStatC37,OOF_COUNT1_ptr,OOFCNT);\cf0\par
+\cf2\tab SaveBytesInt(ConfigStatC37,AIS_COUNT1_ptr,AISCNT);\cf0\par
+\cf2\tab SaveBytesInt(ConfigStatC37,YEL_COUNT1_ptr,YELCNT);\cf0\par
+\par
+\cf2\tab if(InOOF)\{\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,OOF_SEC1_ptr); \tab // get current CNT\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab\tab\tab // Inc OOF-seconds CNT\cf0\par
+\cf2\tab\tab SaveBytesInt(ConfigStatC37,OOF_SEC1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab ERRORS_LED = LED_ON;\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_ON;\cf0\par
+\cf2\tab\tab\tab History = YES;\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\cf2\tab if(InYEL)\{\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,YEL_SEC1_ptr); \tab // get current CNT\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab\tab\tab // Inc YEL-seconds CNT\cf0\par
+\cf2\tab\tab SaveBytesInt(ConfigStatC37,YEL_SEC1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab ERRORS_LED = LED_ON;\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_ON;\cf0\par
+\cf2\tab\tab\tab History = YES;\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\cf2\tab // Framing Errors\cf0\par
+\cf2\tab\ul tmplong\ulnone  = ReadBytesToInt(FOSCR1_ADDR);    \tab //Count Frame errors in ESF Framing Mode from the FOSCR register\cf0\par
+\cf2\tab if(\ul tmplong\ulnone )\{\cf0\par
+\cf2\tab\tab if(ConfigStatC37[FRAME_ptr] == ds1ESF)\{\tab\tab //Only count CRC errors in ESF Framing Mode\cf0\par
+\cf2\tab\tab\tab if(\ul tmplong\ulnone  > ds1_ESFfrm_ses)\{                 \tab\tab // check if it was a SES\cf0\par
+\cf2\tab\tab\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,FBIT_SES1_ptr); \tab // get current SES\cf0\par
+\cf2\tab\tab\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab // Inc SES CNT\cf0\par
+\cf2\tab\tab\tab\tab SaveBytesInt(ConfigStatC37,FBIT_SES1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab\}\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\cf2\tab\tab\ul tmplong\ulnone  += BytesToLong(ConfigStatC37,FBIT_COUNT3_ptr); \tab // get current 32-bit CNT\cf0\par
+\cf2\tab\tab SaveBytesLong(ConfigStatC37,FBIT_COUNT3_ptr,\ul tmplong\ulnone ); \tab\tab // Save total 32-bit CNT into Status array\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,FBIT_ES1_ptr); \tab\tab\tab // get current CNT\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab\tab\tab // Inc ES CNT\cf0\par
+\cf2\tab\tab SaveBytesInt(ConfigStatC37,FBIT_ES1_ptr,\ul tmpint\ulnone ); \tab\tab\tab // Save into Status array\cf0\par
+\cf2\tab\tab ERRORS_LED = LED_ON;\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_ON;\cf0\par
+\cf2\tab\tab History = YES;\cf0\par
+\cf2\tab\tab Misc_stat |= 0x01;      \tab\tab // Send a \ul Bleeeeeeep\ulnone  (bit^0)\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\par
+\cf2\tab\ul //*********************************************************\cf0\ulnone\par
+\cf2\tab\ul //***  Now lets handle the CODE ERR counters \tab\tab\tab ***\cf0\ulnone\par
+\cf2\tab\ul //***\tab Note these are updated on the one_second tick   ***\cf0\ulnone\par
+\cf2\tab\ul //*********************************************************\cf0\ulnone\par
+\cf2\tab\ul tmplong\ulnone  = 0;\cf0\par
+\cf2\tab\ul tmplong\ulnone  = ReadBytesToInt(LCVCR1_ADDR);\tab\tab\tab\tab\tab // get new count\cf0\par
+\cf2\tab if(\ul tmplong\ulnone )\{\tab\tab\tab\tab\tab\tab\tab\tab\tab\tab\tab // If additional errors then...\cf0\par
+\cf2\tab\tab if(\ul tmplong\ulnone  > ds1_bpv_ses)\{                      \tab // check if it was a SES\cf0\par
+\cf2\tab\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,BPV_SES1_ptr); \tab // get current SES\cf0\par
+\cf2\tab\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab\tab\tab\tab // Inc SES CNT\cf0\par
+\cf2\tab\tab\tab SaveBytesInt(ConfigStatC37,BPV_SES1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab\}\cf0\par
+\par
+\cf2\tab\tab\ul tmplong\ulnone  += BytesToLong(ConfigStatC37,BPV_COUNT3_ptr); \tab // get current 32-bit CNT\cf0\par
+\cf2\tab\tab SaveBytesLong(ConfigStatC37,BPV_COUNT3_ptr,\ul tmplong\ulnone ); \tab // Save total 32-bit CNT into Status array\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,BPV_ES1_ptr); \tab\tab // get current CNT\cf0\par
+\cf2\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab\tab\tab\tab    // Inc ES CNT\cf0\par
+\cf2\tab\tab SaveBytesInt(ConfigStatC37,BPV_ES1_ptr,\ul tmpint\ulnone ); \tab\tab // Save into Status array\cf0\par
+\cf2   \tab\tab ERRORS_LED = LED_ON;\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_ON;\cf0\par
+\cf2\tab\tab History = YES;\cf0\par
+\cf2   \tab\tab Misc_stat |= 0x01;      // Send a \ul Bleeeeeeep\ulnone  (bit^0)\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\par
+\par
+\cf2\tab //_____________________________________________________________________________\cf0\par
+\cf2\tab // BERT to \ul Datacomm\ulnone  is ON\cf0\par
+\cf2\tab if(BERT_STATEP&0x80)\{\tab // If BERT ON and we're in qualified SYNC\cf0\par
+\cf2\tab\tab MVAR(char,PCR_ADDR)  = BERT_CONTROLP|0x10; // load error counters\cf0\par
+\cf2\tab\tab MVAR(char,PCR_ADDR)  = BERT_CONTROLP;\cf0\par
+\cf2\tab\tab\ul tmplong\ulnone  = ReadBytesToLong(BECR3ADDR);\tab\tab\tab\tab // Read new count from \ul Dallas\ulnone  2172\cf0\par
+\par
+\cf2\tab\tab if(\ul tmplong\ulnone )\{         \tab\tab\tab\tab\tab\tab\tab\tab // If New errors then ES++\cf0\par
+\cf2\tab\tab\tab\ul tmpint\ulnone  = BytesToInt(ConfigStatC37,DCBERT_ES1_ptr); \tab // get current ES CNT\cf0\par
+\cf2\tab\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab // Inc ES CNT\cf0\par
+\cf2\tab\tab\tab SaveBytesInt(ConfigStatC37,DCBERT_ES1_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab ERRORS_LED3 = LED_ON;\cf0\par
+\cf2\tab\tab\tab HISTORY_LED3 = LED_ON;\cf0\par
+\cf2\tab\tab\tab //History = YES; *** this is NOT "HISTORY" to the PDA......\cf0\par
+\cf2\tab\tab\tab Misc_stat3 |= 0x01;      // Send a \ul Bleeeeeeep\ulnone  (bit^0)\cf0\par
+\par
+\cf2\tab\tab\tab\ul //**** UAS due to SES HANDLER *******************************\cf0\ulnone\par
+\cf2\tab\tab\tab\ul /***\cf0\ulnone\par
+\cf2\tab\tab\tab if(\ul tmplong\ulnone  > ds3_bert_ses)\{         // check if it was a SES\cf0\par
+\cf2\tab\tab\tab\tab ++uas_cntinDC;\tab\tab\tab\tab\tab // Inc \ul uas\ulnone  counter\cf0\par
+\cf2\tab\tab\tab\tab uas_cntoutDC = 0;\tab\tab\tab\tab\tab // Reset out \ul cntr\cf0\ulnone\par
+\par
+\cf2\tab\tab\tab\tab\ul tmpint\ulnone  = BytesToInt(DatacommStat,BERT_SES13_ptr); \tab // get current SES\cf0\par
+\cf2\tab\tab\tab\tab\ul tmpint\ulnone ++;\tab\tab\tab\tab\tab\tab\tab  \tab   \tab\tab\tab // Inc SES CNT\cf0\par
+\cf2\tab\tab\tab\tab SaveBytesInt(DatacommStat,BERT_SES13_ptr,\ul tmpint\ulnone ); \tab // Save into Status array\cf0\par
+\cf2\tab\tab\tab\tab\}\cf0\par
+\cf2\tab\tab\tab else\{\cf0\par
+\cf2\tab\tab\tab\tab if(uas_cntinDC > 9)\{\cf0\par
+\cf2\tab\tab\tab\tab\tab if(++uas_cntoutDC > 9)\cf0\par
+\cf2\tab\tab\tab\tab\tab\tab uas_cntinDC = 0;\tab\tab\tab // Reset going in UAS \ul cntr\cf0\ulnone\par
+\cf2\tab\tab\tab\tab\tab else\cf0\par
+\cf2\tab\tab\tab\tab\tab\tab ++uas_cntinDC;\cf0\par
+\cf2\tab\tab\tab\tab\tab\}\cf0\par
+\cf2\tab\tab\tab\tab else\cf0\par
+\cf2\tab\tab\tab\tab\tab uas_cntinDC = 0;\cf0\par
+\cf2\tab\tab\tab\tab\}\cf0\par
+\cf2\tab\tab\tab\ul //***********************************************************\cf0\ulnone\par
+\cf2\tab\tab\tab ****/\cf0\par
+\cf1\tab\tab\tab\}\cf0\par
+\cf1\tab\tab\tab\cf2 /*****\cf0\par
+\cf2\tab\tab else\{ \tab\tab\tab\tab\tab\tab\tab\tab // Else if we no new errors\cf0\par
+\cf2\tab\tab\tab if(uas_cntinDC > 9)\{\cf0\par
+\cf2\tab\tab\tab\tab if(++uas_cntoutDC > 9)\cf0\par
+\cf2\tab\tab\tab\tab\tab uas_cntinDC = 0;\tab\tab // Reset going in UAS \ul cntr\cf0\ulnone\par
+\cf2\tab\tab\tab\tab else\cf0\par
+\cf2\tab\tab\tab\tab\tab ++uas_cntinDC;\cf0\par
+\cf2\tab\tab\tab\tab\}\cf0\par
+\cf2\tab\tab\tab else\cf0\par
+\cf2\tab\tab\tab\tab uas_cntinDC = 0;\cf0\par
+\cf2\tab\tab\tab\}\cf0\par
+\cf2\tab\tab ***/\cf0\par
+\par
+\cf2 /**\cf0\par
+\cf2\tab\tab\ul tmplong\ulnone  += BytesToLong(ConfigStatC37,DCBECR3_ptr);   // Add new errors (\ul tmplong\ulnone ) to total errors ConfigStatC37[BECR3_ptr]\cf0\par
+\cf2\tab\tab SaveBytesLong(ConfigStatC37,DCBECR3_ptr,\ul tmplong\ulnone ); \tab // Save total 32-bit CNT into Status array\cf0\par
+\cf2\tab\tab\}\cf0\par
+\par
+\par
+\cf2\tab\ul //*****************************************************************************************************\cf0\ulnone\par
+\cf2\tab\ul //******* NO ONE ELSE SHOULD DIDDLE WITH ERRORS & HISTORY LED (unless they're turning them on) ********\cf0\ulnone\par
+\cf2\tab Misc_stat &= 0xF9;\tab\tab\tab // Clear LED bits sent to PDA in Misc_stat byte\cf0\par
+\cf2\tab if(ERRORS_LED == LED_ON)\{\tab // set to current state of ERRORS and HISTORY\cf0\par
+\cf2\tab\tab Misc_stat |= 0x02;      // To PDA as LED ON = 1 and add a \ul Bleeeeeeep\ulnone  (bit^0)\cf0\par
+\cf2\tab\tab AUTO_ERROR = YES;\tab\tab // latch ERROR condition for AUTO-TESTING (only cleared in AUTO-TEST and restart)\cf0\par
+\cf2\tab\tab\}\cf0\par
+\cf2\tab if(History)\tab\tab\tab\tab\tab // THIS history is ALL EVENTS and COUNTS Except BERT errors.\cf0\par
+\cf2\tab\tab Misc_stat |= 0x04;\cf0\par
+\cf2\tab else if(!BERT_ON && HISTORY_LED==LED_ON)   // if NO History and BERT is OFF but the History LED is ON\cf0\par
+\cf2\tab\tab HISTORY_LED = LED_OFF;              \tab // ....then we only took a BIT error when BERT used to be on so CLEAR it out\cf0\par
+\cf2\tab ConfigStatC37[MISC_STAT_ptr] = Misc_stat;\cf0\par
+\cf2 *****/\cf0\par
+\par
+\par
+\f1\fs22\par
+}
+ 

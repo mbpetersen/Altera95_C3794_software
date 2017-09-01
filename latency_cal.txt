@@ -1,0 +1,17 @@
+<Collected and compiled by Stanley Phu 08/28/2015>
+
+10G:		 [(F.S. / 8) *2] + 130
+
+Fiber 1G: 	(F.S. * 1.2504) + 160.74                 //__With a tolerance of up to ~10 clocks under the lowest min delay
+																	//__Copper 1G: A-to-B delay seems to be 2x Fiber + 30-40 cycles so may have to adjust 1G equation’s y-intercept for copper?
+
+100M:	(5e-9 * FS^3) – (6e-5 * FS^2) + (12.596 * FS) + 858.09    //__With a tolerance of up to ~10 clocks but 9600 is up to 200 clocks under
+                OR          
+			(12.5 * FS) + 865                               	//__With a tolerance of up to ~25 clocks under the lowest min delay
+
+10M: 															//__ Update algorithm that is a bit more conservative but should be give us more clearance to avoid going negative:
+			<=1550: (-6E-11 * X^3) + (7E-7 * X^2) + (125 * X) + 7880
+			>1550: (2E-7 * X^3) – (.0007 * X^2) + (125.79 * X) + 7610
+																	//__Both should have a tolerance of up to ~50 clocks under the smallest minimum delay.
+
+
