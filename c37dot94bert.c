@@ -65,6 +65,7 @@ void set_test_pattern() {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_CTL, temp);
 
 	load_test_pattern();
+	start_BERT_test();
 }
 
 void Invert_BERT_pattern()
@@ -144,24 +145,66 @@ void restart_bert()
 	SaveBytesLong(ConfigStatC37,BECR3_ptr,0);			// Clear BERT Counters
 	SaveBytesInt(ConfigStatC37,BERT_ES1_ptr,0);
 	SaveBytesInt(ConfigStatC37,BERT_SES1_ptr,0);
+
+	BERT_STATE &= ~0xC0;	// clear Sync state machine
 }
 
-/***
+
 //********************************************************************************
 //   BERT_STATE
- *   0x00: NO SYNC
- *   0x80: PAT SYNC  (1st SYNC)
- *   0x40: SYNC LOSS (Lost SYNC)
- *   0xC0: PAT LOST  (2nd SYNC - PAT reSYNC'd
- *
- * ConfigStatC37[BSR_ptr] = BERT_STATE;
+//*   0x00: NO SYNC
+//*   0x80: PAT SYNC  (1st SYNC)
+//*   0x40: SYNC LOSS (Lost SYNC)
+//*   0xC0: PAT LOST  (2nd SYNC - PAT reSYNC'd
+//*
+//* ConfigStatC37[BSR_ptr] = BERT_STATE;
 
 //**** ^7=IN-SYNC (1=InSYNC),  ^6=2+SYNC: (0=1stSYNC,1=subsequentSYNC)
 //*** gPatSync	(gStatus[BSR_ptr]&0xC0)	*******	if !([BSR_ptr]&0x80) is NO SYNC
 //												if [BSR_ptr]&0xC0==0x80 is SYNC
 //												if [BSR_ptr]&0xC0==0xC0 is PatLOST
 //********************************************************************************
+#define BERT_INSYNC	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&SYNC_STATUS_MASK)
+void process_bert_sync()		//** BERT SYNC verification Processing **
+{
+	//********************************************************
+	//*** Handle BERT SYNC state changes and flag GUI	 ***
+	//********************************************************************************
+	//**** ^7=IN-SYNC (1=InSYNC),  ^6=2+SYNC: (0=1stSYNC,1=subsequentSYNC)
+	//*** gPatSync	(gStatus[BSR_ptr]&0xC0)	*******	if !([BSR_ptr]&0x80) is NO SYNC
+	//												if [BSR_ptr]&0xC0==0x80 is SYNC
+	//												if [BSR_ptr]&0xC0==0xC0 is PatLOST
+	//********************************************************************************
+	//ADDR_STATUS
+	//SYNC_STATUS_OFS              4    // Pattern sync SYNCED=1, SEARCHING=0
+	//SYNC_STATUS_MASK             0x10
+	//DESYNC_STATUS_OFS            5
+	//DESYNC_STATUS_MASK           0x20
+	//********************************************************************************
+	if(BERT){ //*** if BERT is ON handle in/out sync ***
+		if(BERT_INSYNC){         //******** LOCKED ***********************************
+			if(!(BERT_STATE&0x80)){ 	// If we're not already in SYNC then...
+				BERT_STATE |= 0x80;		// Set SYNC flag.
+				restart_bert();			// Reset all BERT Counters
+				}
+			}
+		else{ //******** NOT LOCKED *******************************
+			if(BERT_STATE&0x80){      	// if we were in SYNC (or PatLOST)
+				BERT_STATE &= ~0x80;    // Clear SYNC flag.
+				BERT_STATE |= 0x40;     // flag loss of LOCK condition
+				Misc_stat37 |= 0x01;      // Send a Bleep in PDA
+				ConfigStatC37[MISC_STATC37_ptr] = Misc_stat37;
+				}
+			}
 
+		ConfigStatC37[BSR_ptr] = BERT_STATE;				// pass current SYNC state
+		}// END if PRI BERT IS ON
+	//**************************************************
+	//*********** END BERT-PRI SYNC HANDLING ***********
+	//**************************************************
+}
+
+/**
 //***********************************************************************
 void process_bert_sync()		//** BERT SYNC verification Processing **
 //***********************************************************************

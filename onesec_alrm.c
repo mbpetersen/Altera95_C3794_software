@@ -3,6 +3,7 @@
 *************************************************************************/
 #include "gigle.h"
 #include "extvars.h"
+#include "c37dot94_def.h"
 
 alt_alarm one_sec_alarm;
 alt_u32 handle_one_sec_alarm();
@@ -10,7 +11,7 @@ alt_u32 handle_one_sec_alarm();
 alt_u32 handle_one_sec_alarm(void)
 {
 	unsigned long tmplong=0;
-	unsigned int tmpint=0;
+
 
 	//**********************************************************
 	//*** ETH Port-A One Second Elapsed Timer   ****************
@@ -50,8 +51,18 @@ alt_u32 handle_one_sec_alarm(void)
 		read_tse_stat_counters(TRIPLE_SPEED_ETHERNET_1_BASE);
 
 
-	if(C3794_READY){
-		;// only process C37 if clock is up & running
+	//_____________________________________________________________________________
+	if(C3794_READY){  // only process C37 if clock is up & running
+		if(ERRORS_LED == ON)	// if we had an error previously then turn it off
+			ERRORS_LED = OFF;
+
+		process_alarms_events();
+
+		if(BERT != 0){			// if BERT is on and running poll errors
+			process_bert_errors();
+			}
+
+		update_history();
 	}
 
 
@@ -59,7 +70,218 @@ alt_u32 handle_one_sec_alarm(void)
 }
 
 
+//_____________________________________________________________________________
+#define LOS	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&LOS_STATUS_MASK)
+void process_bert_errors()
+{
+	//unsigned long long bit_count_reg;
+	unsigned long tmplong=0;
+	unsigned int tmpint=0;
 
+	if(LOS){
+		if(BERT_STATE&0x80){   		// if we were in SYNC (or PatLOST)
+			BERT_STATE |= 0x40; 	// flag loss of LOCK condition
+			Misc_stat37 |= 0x01;    // Send a Bleep in PDA
+			ConfigStatC37[MISC_STATC37_ptr] = Misc_stat37;
+			}
+		}
+
+	// BERT is ON
+	if(BERT_STATE&0x80){	// If BERT ON and we're in qualified SYNC
+		transition_register_bit(ADDR_CTL, CTL_LC_MASK);		// load error counters
+		//bit_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_H);
+		//bit_count_reg = (bit_count_reg << 32);
+		//bit_count_reg += IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_L);
+		tmplong = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_ERROR_COUNT); // read new bit errors
+
+
+		if(tmplong){         								// If New errors then ES++
+			tmpint = BytesToInt(ConfigStatC37,BERT_ES1_ptr); 	// get current ES CNT
+			tmpint++;							 	  		// Inc ES CNT
+			SaveBytesInt(ConfigStatC37,BERT_ES1_ptr,tmpint); 	// Save into Status array
+			ERRORS_LED = ON;
+			HISTORY_LED = ON;
+			//History = YES; *** this is NOT "HISTORY" to the GUI......
+			//MISC_STATC37_ptr	MaxConfig+123	// Bleep^0, Error^1, History^2, tweedle^3, TimesUP^4, FAIL^5^, LOCAL_CHG^6
+			Misc_stat37 |= 0x01;      // Send a Bleeeeeeep (bit^0)
+
+			//**** UAS due to SES HANDLER *******************************
+			/***
+			if(tmplong > ds3_bert_ses){         // check if it was a SES
+				++uas_cntinDC;					// Inc uas counter
+				uas_cntoutDC = 0;					// Reset out cntr
+
+				tmpint = BytesToInt(DatacommStat,BERT_SES13_ptr); 	// get current SES
+				tmpint++;							 	  			// Inc SES CNT
+				SaveBytesInt(DatacommStat,BERT_SES13_ptr,tmpint); 	// Save into Status array
+				}
+			else{
+				if(uas_cntinDC > 9){
+					if(++uas_cntoutDC > 9)
+						uas_cntinDC = 0;			// Reset going in UAS cntr
+					else
+						++uas_cntinDC;
+					}
+				else
+					uas_cntinDC = 0;
+				}
+			//***********************************************************
+			****/
+			}
+			/*****
+		else{ 								// Else if we no new errors
+			if(uas_cntinDC > 9){
+				if(++uas_cntoutDC > 9)
+					uas_cntinDC = 0;		// Reset going in UAS cntr
+				else
+					++uas_cntinDC;
+				}
+			else
+				uas_cntinDC = 0;
+			}
+		***/
+
+		tmplong += BytesToLong(ConfigStatC37,BECR3_ptr);   // Add new errors (tmplong) to total errors ConfigStatC37[BECR3_ptr]
+		SaveBytesLong(ConfigStatC37,BECR3_ptr,tmplong); 	// Save total 32-bit CNT into Status array
+
+		D(-1, BUG("\nBit errors: %lu", tmplong));
+		}
+}
+
+#define RCVCLOCK_LOCKED	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&CLOCK_STATUS_MASK)
+#define TEST_ACTIVE		((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&TEST_STATUS_MASK)
+#define LOS_NOTACTIVE	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&LOS_STATUS_MASK)
+#define RDI_NOTACTIVE	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&RDI_STATUS_MASK)
+#define BERT_INSYNC	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&SYNC_STATUS_MASK)
+////     Status counters (R/clear on Write)
+//#define ADDR_LOS_DETECT    0x040 // (wd add 0x10)    // Number of times Loss of Signal condition detected
+//#define ADDR_LOS_ACTIVE    0x044 // (wd add 0x11)    // Number of frames where LOS is active
+//#define ADDR_RDI_DETECT    0x048 // (wd add 0x12)    // Number of times Remote Defect Indication condition detected
+//#define ADDR_RDI_ACTIVE    0x04c // (wd add 0x13)    // Number of frames where RDI is active
+//#define ADDR_FRAMES_RX     0x050 // (wd add 0x14)    // Number of frames received during active tests
+//#define ADDR_FRAMES_TX     0x054 // (wd add 0x15)    // Number of frames transmitted during active tests
+void process_alarms_events()
+{
+	unsigned long tmplong=0;
+	unsigned int tmpint=0;
+
+	dump_C3794_status(); // TMP DEBUG DISPLAY
+
+	//***************************************************************
+	//*** Handle the ALARM counters (inc'd real-time in the intr) ***
+	//***************************************************************
+	SaveBytesInt(ConfigStatC37,LOS_COUNT1_ptr,LOSCNT); 	// ALARM CNTR's inc in intr
+
+	if(!LOS_NOTACTIVE){                    // We have LOS so...
+		tmpint = BytesToInt(ConfigStatC37,LOS_SEC1_ptr); 	// get current CNT
+		tmpint++;							 				// Inc LOS-seconds CNT
+		SaveBytesInt(ConfigStatC37,LOS_SEC1_ptr,tmpint); 	// Save into Status array
+		ERRORS_LED = LED_ON;
+		HISTORY_LED = LED_ON;
+		//History = YES; 	//this history is used as history of only alarms & events (excluding BERTS)
+		}
+	SaveBytesInt(ConfigStatC37,OOF_COUNT1_ptr,OOFCNT);	// ALARM CNTR's inc in intr
+	SaveBytesInt(ConfigStatC37,YEL_COUNT1_ptr,YELCNT);	// ALARM CNTR's inc in intr
+
+//#define ADDR_BAD_FRAMES_RX          0x078 // (wd add 0x1e)    // Found error in any frame
+//#define ADDR_BAD_FRAMES_PER_SEC     0x07c // (wd add 0x1f)    // Bad frames per second, always updating
+/** definition pending clarification from OnCore
+	if(InOOF){
+		tmpint = BytesToInt(ConfigStatC37,OOF_SEC1_ptr); 	// get current CNT
+		tmpint++;							 			// Inc OOF-seconds CNT
+		SaveBytesInt(ConfigStatC37,OOF_SEC1_ptr,tmpint); 	// Save into Status array
+		ERRORS_LED = LED_ON;
+		HISTORY_LED = LED_ON;
+		//History = YES; 	//this history is used as history of only alarms & events (excluding BERTS)
+		}
+**/
+
+	if(!RDI_NOTACTIVE){	// In Yellow Alarm
+		tmpint = BytesToInt(ConfigStatC37,YEL_SEC1_ptr); 	// get current CNT
+		tmpint++;							 			// Inc YEL-seconds CNT
+		SaveBytesInt(ConfigStatC37,YEL_SEC1_ptr,tmpint); 	// Save into Status array
+		ERRORS_LED = LED_ON;
+		HISTORY_LED = LED_ON;
+		//History = YES; 	//this history is used as history of only alarms & events (excluding BERTS)
+		}
+
+/** definition pending clarification from OnCore
+#define ADDR_MSMTCH_ERR_HDR_BITS_L     0x080 // (wd add 0x20)    // Number of mismatch errors on headers, lower 32 bits
+#define ADDR_MSMTCH_ERR_HDR_BITS_H     0x084 // (wd add 0x21)    // Number of mismatch errors on headers, upper 8 bits
+#define ADDR_MSMTCH_ERR_HDR_FRAMES     0x088 // (wd add 0x22)    // Number of frames with mismatch errors on headers
+#define ADDR_MSMTCH_ERR_OV_N_BITS_L    0x08c // (wd add 0x23)    // Number of mismatch errors on overhead N, lower 32 bits
+#define ADDR_MSMTCH_ERR_OV_N_BITS_H    0x090 // (wd add 0x24)    // Number of mismatch errors on overhead N, upper 8 bits
+#define ADDR_MSMTCH_ERR_OV_N_FRAMES    0x094 // (wd add 0x25)    // Number of frames with mismatch errors on overhead N
+#define ADDR_MSMTCH_ERR_OV_FIX_BITS_L  0x098 // (wd add 0x26)    // Number of mismatch errors on overhead fixed, lower 32 bits
+#define ADDR_MSMTCH_ERR_OV_FIX_BITS_H  0x09c // (wd add 0x27)    // Number of mismatch errors on overhead fixed, upper 8 bits
+#define ADDR_MSMTCH_ERR_OV_FIX_FRAMES  0x0a0 // (wd add 0x28)    // Number of frames with mismatch errors on overhead fixed
+****
+	// Framing Errors
+	tmplong = ReadBytesToInt(FOSCR1_ADDR);    		//Count Frame errors in ESF Framing Mode from the FOSCR register
+	if(tmplong){
+		if(ConfigStatC37[FRAME_ptr] == ds1ESF){		//Only count CRC errors in ESF Framing Mode
+			if(tmplong > ds1_ESFfrm_ses){                 			// check if it was a SES
+				tmpint = BytesToInt(ConfigStatC37,FBIT_SES1_ptr); 	// get current SES
+				tmpint++;							 	  			// Inc SES CNT
+				SaveBytesInt(ConfigStatC37,FBIT_SES1_ptr,tmpint); 	// Save into Status array
+			}
+		}
+
+		tmplong += BytesToLong(ConfigStatC37,FBIT_COUNT3_ptr); 		// get current 32-bit CNT
+		SaveBytesLong(ConfigStatC37,FBIT_COUNT3_ptr,tmplong); 		// Save total 32-bit CNT into Status array
+		tmpint = BytesToInt(ConfigStatC37,FBIT_ES1_ptr); 			// get current CNT
+		tmpint++;							 	  					// Inc ES CNT
+		SaveBytesInt(ConfigStatC37,FBIT_ES1_ptr,tmpint); 			// Save into Status array
+		ERRORS_LED = LED_ON;
+		HISTORY_LED = LED_ON;
+		History = YES;
+		Misc_stat |= 0x01;      		// Send a Bleeeeeeep (bit^0)
+		}
+
+
+	//*********************************************************
+	//***  Now lets handle the CODE ERR counters 			***
+	//***	Note these are updated on the one_second tick   ***
+	//*********************************************************
+	tmplong = 0;
+	tmplong = ReadBytesToInt(LCVCR1_ADDR);					// get new count
+	if(tmplong){											// If additional errors then...
+		if(tmplong > ds1_bpv_ses){                      	// check if it was a SES
+			tmpint = BytesToInt(ConfigStatC37,BPV_SES1_ptr); 	// get current SES
+			tmpint++;							 	  					// Inc SES CNT
+			SaveBytesInt(ConfigStatC37,BPV_SES1_ptr,tmpint); 	// Save into Status array
+			}
+
+		tmplong += BytesToLong(ConfigStatC37,BPV_COUNT3_ptr); 	// get current 32-bit CNT
+		SaveBytesLong(ConfigStatC37,BPV_COUNT3_ptr,tmplong); 	// Save total 32-bit CNT into Status array
+		tmpint = BytesToInt(ConfigStatC37,BPV_ES1_ptr); 		// get current CNT
+		tmpint++;							 	  					   // Inc ES CNT
+		SaveBytesInt(ConfigStatC37,BPV_ES1_ptr,tmpint); 		// Save into Status array
+  		ERRORS_LED = LED_ON;
+		HISTORY_LED = LED_ON;
+		History = YES;
+  		Misc_stat |= 0x01;      // Send a Bleeeeeeep (bit^0)
+		}
+
+**/
+}
+
+
+
+void update_history()
+{
+	//*****************************************************************************************************
+	//******* NO ONE ELSE SHOULD DIDDLE WITH ERRORS & HISTORY LED (unless they're turning them on) ********
+	Misc_stat37 &= 0xF9;			// Clear LED bits sent to PDA in Misc_stat byte
+	if(ERRORS_LED == ON)			// set to current state of ERRORS and HISTORY
+		Misc_stat37 |= 0x02;      	// To GUI as LED ON = 1 and add a Bleeeeeeep (bit^0)
+	//if(History)					// THIS history is ALL EVENTS and COUNTS Except BERT errors.
+	if(HISTORY_LED)					// THIS history is ALL EVENTS, COUNTS And BERT errors.
+		Misc_stat37 |= 0x04;
+	else if((BERT_STATE&0x80)==0 && HISTORY_LED == ON)   // if NO History and BERT is OFF but the History LED is ON
+		HISTORY_LED = LED_OFF;              	// ....then we only took a BIT error when BERT used to be on so CLEAR it out
+	ConfigStatC37[MISC_STATC37_ptr] = Misc_stat37;
+}
 /*************************************************************************
 * Copyright (c) 2017 Greenlee Communications Vista, CA USA.    			 *
 * All rights reserved.                                                   *

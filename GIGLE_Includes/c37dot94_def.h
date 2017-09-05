@@ -126,7 +126,7 @@
 #define FRC_XMIT_JITTER_OFS          0  // Set transmit jitter in clock increments
 #define FRC_XMIT_JITTER_SIZE         4  // Valid range 0 - 13(~100ns).
 #define FRC_XMIT_MASTER_OFS          5  // Set transmitter as Master,
-// no phase adjustment
+
 #define ADDR_STATUS            0x030 // (wd add 0xc)    // Collection of status bits:
 #define TEST_STATUS_OFS              0    // Test status ACTIVE=1,STANDBY=0
 #define TEST_STATUS_MASK             0x1 

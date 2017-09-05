@@ -66,11 +66,13 @@ unsigned char	ConfigStatC37[MaxStatus];
 unsigned char	C3794_Status=0;
 signed short	PPM_offset=0;
 _Bool 	BERT_SYNC = 0,BERT_INVERT=0;
+_Bool	ERRORS_LED=0, HISTORY_LED=0;
 unsigned int	CLKCTRL_register=0;
 
 BERT_Patterns BERT=0;
-unsigned char 	BERT_STATUS=0, incntr=0, outcntr=0, BERT_STATE=0;
+unsigned char 	BERT_STATUS=0, incntr=0, outcntr=0, BERT_STATE=0, Misc_stat37=0;
 unsigned long   USER_PAT=0;
+unsigned short	LOSCNT=0, OOFCNT=0, YELCNT=0;	// periodically cleared, stored in status[]
 
 
 

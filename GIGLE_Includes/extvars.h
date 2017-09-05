@@ -66,9 +66,11 @@ extern unsigned char	C3794_Status;
 extern signed short		PPM_offset;
 extern unsigned int		CLKCTRL_register;
 extern BERT_Patterns BERT;
-extern unsigned char	BERT_STATUS, incntr, outcntr, BERT_STATE;
+extern unsigned char	BERT_STATUS, incntr, outcntr, BERT_STATE, Misc_stat37;
 extern unsigned long	USER_PAT;
 extern _Bool 	BERT_SYNC, BERT_INVERT;
+extern _Bool	ERRORS_LED, HISTORY_LED;
+extern unsigned short	LOSCNT, OOFCNT, YELCNT;
 
 
 extern unsigned short PIO2_Content; // default - both A&B at 10M

@@ -82,14 +82,13 @@ unsigned long LongInt=0;
 					BERT = RxBuffer[BERTC37_ptr];
 					//write_bertP();
 					set_test_pattern();
-
+					restart_bert(); // flush errors and set ELAP to 0
   	 				break;
 
   	 			case CLEARC37_ptr:    		//14	// RESTART^0, clear gTimesUp flag^1, PDA_ACK^7 to LOCAL_CHG (misc_stat^6)
   	 				//ConfigStatC37[CLEARC37_ptr] = 0;
 					if(((RxBuffer[CLEARC37_ptr])&0x01) != ((ConfigStatC37[CLEARC37_ptr])&0x01)){
 				   		restart_bert();
-				     	BERT_STATE &= ~0xC0;
 				     	ConfigStatC37[BSR_ptr] = BERT_STATE;
 				   		//restart_history();	// use below for now....
 				   		SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,0); // Clear ET Clock

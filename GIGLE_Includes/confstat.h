@@ -1712,9 +1712,9 @@ typedef enum {
 	OneIn6     // 0100_0010 0x00000020
 } BERT_Patterns;
 
-/********************************/
-/* BERT definitions			  */
-/********************************/
+//********************************
+//* BERT definitions
+//********************************
 #define SYNC	(BERT_STATUS&0x01)   // 2172 BERT status register
 #define RLOS	(BERT_STATUS&0x10)
 #define RA1A0	(BERT_STATUS&0x60)
@@ -1722,6 +1722,14 @@ typedef enum {
 #define RALL0	(BERT_STATUS&0x20)
 #define SYNCINCNT	3
 #define SYNCOUTCNT	3
+
+//Misc_stat37
+#define gBleep   (gStatus[MISC_STATC37_ptr]&0x01)	// Bleeeeeep....
+#define gErrors  (gStatus[MISC_STATC37_ptr]&0x02)	// ERRORS LED
+#define gHistory (gStatus[MISC_STATC37_ptr]&0x04)	// HISTORY LED
+#define gTweedle (gStatus[MISC_STATC37_ptr]&0x08)	// Lpbk/Sync sound....
+#define gTimesUp (gStatus[MISC_STATC37_ptr]&0x10)	// Timed test IVL complete!
+#define gLocalChg (gStatus[MISC_STATC37_ptr]&0x40)	// LOCAL change performed by MOD (for now just a Bert)
 
 // C37.94 Frame: 256 bits  256bits at 8kHz rate = 2.048Mbps  256/8=32bytes total
 // Header	16bits		abcdefgh,00001111
