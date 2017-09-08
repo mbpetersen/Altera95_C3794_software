@@ -63,7 +63,7 @@ unsigned long LongInt=0;
 
   	 			case TX_CHANS_ptr:    	//9	range:1-12
   	 				//ConfigStatC37[TX_CHANS_ptr] = 1;
-  	 				set_N_CHANNELS(RxBuffer[i]);
+  	 				set_XMT_N_CHANNELS(RxBuffer[i]);
   	 				break;
   	 			case RX_CHANS_ptr:    	//10 range:1-12
   	 				//ConfigStatC37[RX_CHANS_ptr] = 1;
@@ -81,8 +81,18 @@ unsigned long LongInt=0;
   	 				//ConfigStatC37[BERTC37_ptr] = 0;
 					BERT = RxBuffer[BERTC37_ptr];
 					//write_bertP();
-					set_test_pattern();
-					restart_bert(); // flush errors and set ELAP to 0
+					if(BERT!=0){
+						D(1, BUG("\n Starting BERT Test"));
+						set_test_pattern();
+						restart_bert(); // flush errors and set ELAP to 0
+						BERT_STATE &= ~0xC0;	// clear Sync state machine on new pattern
+						}
+					else{ // BERT==0
+						D(1, BUG("\n Stopping BERT Test"));
+						stop_BERT_test();	//TEMP for now
+						//set_XMT_N_CHANNELS(0);
+						//set_test_pattern();	//call set_test_pattern with V54 and set TxCHANS to 0.
+						}
   	 				break;
 
   	 			case CLEARC37_ptr:    		//14	// RESTART^0, clear gTimesUp flag^1, PDA_ACK^7 to LOCAL_CHG (misc_stat^6)
@@ -98,8 +108,10 @@ unsigned long LongInt=0;
   	 			case MISCC37_ptr:     		//15	// Insert BERT err^8, ?^0 , Power-Down? ^3;0x08=INVERT_BERT
   	 				//ConfigStatC37[MISCC37_ptr] = 0;
 					//*** if INSERT LOGIC ERROR .....do it!
-					if(((RxBuffer[MISCC37_ptr])&0x80) != ((ConfigStatC37[MISCC37_ptr])&0x80)) // if MISC - Insert Logic error is set
+					if(((RxBuffer[MISCC37_ptr])&0x80) != ((ConfigStatC37[MISCC37_ptr])&0x80)){ // if MISC - Insert Logic error is set
+						D(1, BUG("\n Inserting BERT Bit Error"));
 						Insert_BERT_biterror();
+						}
 
 
 					//*********************************************************************************

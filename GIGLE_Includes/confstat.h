@@ -1584,7 +1584,12 @@ and the associated frame type settings like how long the hdr is, where the IPv4 
 //************************************************************************
 //	C37.94	DEFINITIONS
 //************************************************************************
-#define	C3794_READY		(C3794_Status&0x80)
+#define	C3794_READY		(C3794_State&0x80)
+#define RCVCLOCK_LOCKED	(C3794_status&CLOCK_STATUS_MASK) == CLOCK_STATUS_MASK
+#define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
+#define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
+#define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
+#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
 
 /*********************************************************************/
 /********** Configuration Bytes from UI to C37.94 "Module" ***********/
@@ -1689,6 +1694,7 @@ and the associated frame type settings like how long the hdr is, where the IPv4 
 #define C37SECONDS0_ptr MaxConfig+77
 
 typedef enum {
+	BertOFF,			//configures to V54
 	Poly511,
 	Poly2047,
 	Poly2e15,
@@ -1699,17 +1705,18 @@ typedef enum {
 	PolyQRSS,
 
 	Poly63,
-	PolyV54,
 
-	AIS,       // all 1's
-	A0S,       // all 0's
+	All1,       // all 1's
+	ALL0,       // all 0's
 	Alt,       // Alternating 1010...
 	ThreeIn24, // 0010_0000_0000_0000_0010_0010
 	OneIn8,    // 0000_0001  same as 1:7
 	TwoIn8,    // 0100_0010
 
 	OneIn5,    // 0100_0010 0x00000010
-	OneIn6     // 0100_0010 0x00000020
+	OneIn6,     // 0100_0010 0x00000020
+
+	PolyV54
 } BERT_Patterns;
 
 //********************************

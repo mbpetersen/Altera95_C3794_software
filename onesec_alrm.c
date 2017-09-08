@@ -53,9 +53,68 @@ alt_u32 handle_one_sec_alarm(void)
 
 	//_____________________________________________________________________________
 	if(C3794_READY){  // only process C37 if clock is up & running
+		//**********************************************************
+		//***  C37.94 One Second Elapsed Timer   ****************
+		//**********************************************************
+		tmplong = BytesToLong(ConfigStatC37,C37SECONDS3_ptr); 	// get and INC ET SECONDS
+		if(++tmplong > 0xFFFF0000)	// clamp max value
+			tmplong = 0xFFFF0000;
+		SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,tmplong);
+
+		if(tmplong==2){
+			issue_UI_command(BERTC37_ptr,Poly2047);	//Emulate UI command
+			}
+		else if(tmplong==8){	// 24secs in...
+			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
+			//stop_BERT_test();
+			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
+			}
+		else if(tmplong==9){	// 24secs in...
+			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,Poly511);	//Emulate UI command
+			}
+		else if(tmplong==11){	// 24secs in...
+			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
+			//stop_BERT_test();
+			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
+			}
+		else if(tmplong==12){	// 24secs in...
+			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,Alt);	//Emulate UI command
+			}
+		else if(tmplong==14){	// 24secs in...
+			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
+			//stop_BERT_test();
+			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
+			}
+		else if(tmplong==15){	// 24secs in...
+			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,TwoIn8);	//Emulate UI command
+			}
+		else if(tmplong==23){	// 23secs in...
+			clear_internal_loopback();
+			D(1, BUG("\n\t....CLR INTL LPBK...")); // TMP DEBUG DISPLAY
+			}
+		else if(tmplong==24){	// 24secs in...
+			D(1, BUG("\n\t....SET INTL LPBK...")); // TMP DEBUG DISPLAY
+			set_internal_loopback();
+			}
+
+
+
+		//update_alarms_event_status();// moved to main task....
 		if(ERRORS_LED == ON)	// if we had an error previously then turn it off
 			ERRORS_LED = OFF;
 
+		if(tmplong%5==0){
+			RxBuffer[MISCC37_ptr] ^= 0x80;	// "set" UI insert Error bit
+			issue_UI_command(MISCC37_ptr, RxBuffer[MISCC37_ptr]);	//Emulate UI command
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			dump_C3794_status(); // TMP DEBUG DISPLAY
+			}
 		process_alarms_events();
 
 		if(BERT != 0){			// if BERT is on and running poll errors
@@ -70,15 +129,30 @@ alt_u32 handle_one_sec_alarm(void)
 }
 
 
+//Update Alarm & Events Flags
+/**
+#define RCVCLOCK_LOCKED	(C3794_status&CLOCK_STATUS_MASK) == CLOCK_STATUS_MASK
+#define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
+#define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
+#define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
+#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
+ */
+void update_alarms_event_status()
+{
+	C3794_status = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
+	//D(1, BUG("\nC3794_status_reg: %0X", C3794_status));
+}
+
 //_____________________________________________________________________________
-#define LOS	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&LOS_STATUS_MASK)
 void process_bert_errors()
 {
 	//unsigned long long bit_count_reg;
 	unsigned long tmplong=0;
 	unsigned int tmpint=0;
 
-	if(LOS){
+
+	if(LOS_ACTIVE){	// If we're in LOS
+		D(1, BUG("\nIn Process_BERT errors(): in LOS_ACTIVE"));
 		if(BERT_STATE&0x80){   		// if we were in SYNC (or PatLOST)
 			BERT_STATE |= 0x40; 	// flag loss of LOCK condition
 			Misc_stat37 |= 0x01;    // Send a Bleep in PDA
@@ -127,6 +201,10 @@ void process_bert_errors()
 				}
 			//***********************************************************
 			****/
+			//only update bit errs to status if new errors!
+			tmplong += BytesToLong(ConfigStatC37,BECR3_ptr);	// Add new errors (tmplong) to total errors ConfigStatC37[BECR3_ptr]
+			SaveBytesLong(ConfigStatC37,BECR3_ptr,tmplong); 	// Save total 32-bit CNT into Status array
+			D(1, BUG("\nNew Bit errors: %lu", tmplong));
 			}
 			/*****
 		else{ 								// Else if we no new errors
@@ -140,19 +218,10 @@ void process_bert_errors()
 				uas_cntinDC = 0;
 			}
 		***/
-
-		tmplong += BytesToLong(ConfigStatC37,BECR3_ptr);   // Add new errors (tmplong) to total errors ConfigStatC37[BECR3_ptr]
-		SaveBytesLong(ConfigStatC37,BECR3_ptr,tmplong); 	// Save total 32-bit CNT into Status array
-
-		D(-1, BUG("\nBit errors: %lu", tmplong));
 		}
 }
 
-#define RCVCLOCK_LOCKED	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&CLOCK_STATUS_MASK)
-#define TEST_ACTIVE		((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&TEST_STATUS_MASK)
-#define LOS_NOTACTIVE	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&LOS_STATUS_MASK)
-#define RDI_NOTACTIVE	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&RDI_STATUS_MASK)
-#define BERT_INSYNC	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&SYNC_STATUS_MASK)
+
 ////     Status counters (R/clear on Write)
 //#define ADDR_LOS_DETECT    0x040 // (wd add 0x10)    // Number of times Loss of Signal condition detected
 //#define ADDR_LOS_ACTIVE    0x044 // (wd add 0x11)    // Number of frames where LOS is active
@@ -165,14 +234,14 @@ void process_alarms_events()
 	unsigned long tmplong=0;
 	unsigned int tmpint=0;
 
-	dump_C3794_status(); // TMP DEBUG DISPLAY
+	//dump_C3794_status(); // TMP DEBUG DISPLAY
 
 	//***************************************************************
 	//*** Handle the ALARM counters (inc'd real-time in the intr) ***
 	//***************************************************************
 	SaveBytesInt(ConfigStatC37,LOS_COUNT1_ptr,LOSCNT); 	// ALARM CNTR's inc in intr
 
-	if(!LOS_NOTACTIVE){                    // We have LOS so...
+	if(LOS_ACTIVE){                    // We have LOS so...
 		tmpint = BytesToInt(ConfigStatC37,LOS_SEC1_ptr); 	// get current CNT
 		tmpint++;							 				// Inc LOS-seconds CNT
 		SaveBytesInt(ConfigStatC37,LOS_SEC1_ptr,tmpint); 	// Save into Status array
@@ -196,7 +265,7 @@ void process_alarms_events()
 		}
 **/
 
-	if(!RDI_NOTACTIVE){	// In Yellow Alarm
+	if(RDI_ACTIVE){	// In Yellow Alarm
 		tmpint = BytesToInt(ConfigStatC37,YEL_SEC1_ptr); 	// get current CNT
 		tmpint++;							 			// Inc YEL-seconds CNT
 		SaveBytesInt(ConfigStatC37,YEL_SEC1_ptr,tmpint); 	// Save into Status array
@@ -204,6 +273,7 @@ void process_alarms_events()
 		HISTORY_LED = LED_ON;
 		//History = YES; 	//this history is used as history of only alarms & events (excluding BERTS)
 		}
+
 
 /** definition pending clarification from OnCore
 #define ADDR_MSMTCH_ERR_HDR_BITS_L     0x080 // (wd add 0x20)    // Number of mismatch errors on headers, lower 32 bits

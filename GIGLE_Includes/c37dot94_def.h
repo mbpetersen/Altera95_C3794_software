@@ -34,7 +34,7 @@
 //     Address range 0 to 15 
 // ___________________________________________
 #define ADDR_RUNFRAMES         0x000 // (wd add 0x0)    // Run test for this many frames
-#define ADDR_N_CHANNELS        0x004 // (wd add 0x1)    // Configure N from 1 to 12
+#define ADDR_XMT_N_CHANNELS    0x004 // (wd add 0x1)    // Configure N from 1 to 12
 #define ADDR_RCV_N_CHANNELS    0x008 // (wd add 0x2)    // Configure N from 1 to 12
 
 #define ADDR_MATCH 0x00c // (wd add 0x03  def=0x24
@@ -127,6 +127,7 @@
 #define FRC_XMIT_JITTER_SIZE         4  // Valid range 0 - 13(~100ns).
 #define FRC_XMIT_MASTER_OFS          5  // Set transmitter as Master,
 
+//currently 8 bits of status
 #define ADDR_STATUS            0x030 // (wd add 0xc)    // Collection of status bits:
 #define TEST_STATUS_OFS              0    // Test status ACTIVE=1,STANDBY=0
 #define TEST_STATUS_MASK             0x1 
@@ -143,9 +144,9 @@
 #define DESYNC_STATUS_MASK           0x20
 #define UNLOCKED                     0
 #define LOCKED                       1
-#define LOS_ACTIVE                   0
+#define LOS_ACTIVE_STATE             0
 #define LOS_INACTIVE                 1
-#define RDI_ACTIVE                   0
+#define RDI_ACTIVE_STATE             0
 #define RDI_INACTIVE                 1
 #define SEARCHING                    0
 #define SYNCED                       1
@@ -154,12 +155,12 @@
 //     Status counters (R/clear on Write)
 //     Address range 16 to 21
 // ___________________________________________
-#define ADDR_LOS_DETECT    0x040 // (wd add 0x10)    // Number of times Loss of Signal condition detected
-#define ADDR_LOS_ACTIVE    0x044 // (wd add 0x11)    // Number of frames where LOS is active
-#define ADDR_RDI_DETECT    0x048 // (wd add 0x12)    // Number of times Remote Defect Indication condition detected
-#define ADDR_RDI_ACTIVE    0x04c // (wd add 0x13)    // Number of frames where RDI is active
-#define ADDR_FRAMES_RX     0x050 // (wd add 0x14)    // Number of frames received during active tests
-#define ADDR_FRAMES_TX     0x054 // (wd add 0x15)    // Number of frames transmitted during active tests
+#define ADDR_LOS_DETECT_CNT    		0x040 // (wd add 0x10)    // Number of times Loss of Signal condition detected
+#define ADDR_LOS_NUMFRMS_ACTIVE    	0x044 // (wd add 0x11)    // Number of frames where LOS is active
+#define ADDR_RDI_DETECT_CNT    		0x048 // (wd add 0x12)    // Number of times Remote Defect Indication condition detected
+#define ADDR_RDI_NUMFRMS_ACTIVE    	0x04c // (wd add 0x13)    // Number of frames where RDI is active
+#define ADDR_NUM_FRAMES_RX     		0x050 // (wd add 0x14)    // Number of frames received during active tests
+#define ADDR_NUM_FRAMES_TX     		0x054 // (wd add 0x15)    // Number of frames transmitted during active tests
 
 // ___________________________________________
 //     Clock control address parameters (R/W)

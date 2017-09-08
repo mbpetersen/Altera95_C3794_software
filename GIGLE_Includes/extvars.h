@@ -62,7 +62,7 @@ extern unsigned char GIGE_STATUS; // passed into [GIGERESULT_ptr]
 //_______________________________________
 // BERT patterns
 extern unsigned char	ConfigStatC37[MaxStatus];
-extern unsigned char	C3794_Status;
+extern unsigned char	C3794_State, C3794_status;
 extern signed short		PPM_offset;
 extern unsigned int		CLKCTRL_register;
 extern BERT_Patterns BERT;

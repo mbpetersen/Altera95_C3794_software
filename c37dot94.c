@@ -1,7 +1,7 @@
 /*************************************************************************
-*		C37.94 BERT Test Functions  									 *
+*		C37.94 Functions  									 			 *
 *				   														 *
-* Copyright (c) 2016 Greenlee Communications, CA USA.    *
+* Copyright (c) 2017  Greenlee Communications  Vista, CA USA.    		 *
 * All rights reserved.                                                   *
 *************************************************************************/
 #include "gigle.h"
@@ -44,17 +44,24 @@ void set_internal_loopback()
 {
 	set_register_bit(ADDR_DEBUG, DEBUG_LOOPBACK_MASK);
 }
-
+void clear_internal_loopback()
+{
+	clear_register_bit(ADDR_DEBUG, DEBUG_LOOPBACK_MASK);
+}
 void set_far_end_loopback()
 {
 	set_register_bit(ADDR_DEBUG, DEBUG_FAR_END_LOOPBACK_MASK);
+}
+void clear_far_end_loopback()
+{
+	clear_register_bit(ADDR_DEBUG, DEBUG_FAR_END_LOOPBACK_MASK);
 }
 void set_IDLE_code(unsigned char value) {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_IDLE_CODE, value);
 }
 
-void set_N_CHANNELS(unsigned char value) {
-	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_N_CHANNELS, value);
+void set_XMT_N_CHANNELS(unsigned char value) {
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_XMT_N_CHANNELS, value);
 }
 
 void set_RCV_N_CHANNELS(unsigned char value) {
@@ -110,28 +117,36 @@ void verify_register(unsigned int addr, unsigned int expected, unsigned int mask
 
 }
 
+/*
+#define RCVCLOCK_LOCKED	(C3794_status&CLOCK_STATUS_MASK) == CLOCK_STATUS_MASK
+#define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
+#define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
+#define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
+#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
+ */
 void dump_C3794_status() {
 	unsigned int temp;
 
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	D(1, BUG("\tINFO: C3794 STATUS register: 0x%02x\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT);
-	D(1, BUG("\tINFO: C3794 LOS_DETECT register: %d\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_ACTIVE);
-	D(1, BUG("\tINFO: C3794 LOS_ACTIVE register: %d\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_DETECT);
-	D(1, BUG("\tINFO: C3794 RDI_DETECT register: %d\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_ACTIVE);
-	D(1, BUG("\tINFO: C3794 RDI_ACTIVE register: %d\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_FRAMES_TX);
-	D(1, BUG("\tINFO: C3794 (Active)FRAMES_TX register: %d\n", temp));
+	D(1, BUG("\n\tINFO: C3794 STATUS register: 0x%02x", temp));
+	D(1, BUG("\nRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT_CNT);
+	D(1, BUG("\tINFO: C3794 LOS_DETECT_CNT_  register: %d\n", temp));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_NUMFRMS_ACTIVE);
+	D(1, BUG("\tINFO: C3794 LOS_ACTIVE_#FRMS register: %d\n", temp));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_DETECT_CNT);
+	D(1, BUG("\tINFO: C3794 RDI_DETECT_CNT_  register: %d\n", temp));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_NUMFRMS_ACTIVE);
+	D(1, BUG("\tINFO: C3794 RDI_ACTIVE_#FRMS register: %d\n", temp));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_TX);
+	D(1, BUG("\tINFO: C3794 FRAMES_TX'D: %d	FRAMES_RX'D: %d \n", temp, IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_RX)));
 }
 
 /// TODO
 //_________________________________________________________________________________
 void reset_C3794_blocks()
 {
-	C3794_Status = 0;	//C37.94 Logic NOT Available - Do NOT R/W or lock-up will occur
+	C3794_State = 0;	//C37.94 Logic NOT Available - Do NOT R/W or lock-up will occur
 	PIO3_Content = IORD_ALTERA_AVALON_PIO_DATA(PIO_3IO_BASE);
 	PIO3_Content |= RESET_C3794_mask;
 	IOWR_ALTERA_AVALON_PIO_DATA(PIO_3IO_BASE, PIO3_Content);
@@ -157,12 +172,12 @@ void write_ppm_offset(signed short ppm_value)
 
 	if(wait_for_C3794_clk() != 0){
 		gate_C3794_blocks();	// Take C37.94 verilog OUT of reset
-		C3794_Status = 0x80;	//C37.94 Logic Available
+		C3794_State = 0x80;	//C37.94 Logic Available
 		//_configure/set C37.94 blocks
 		D(1, BUG("C37.94 AVAILABLE!\n"));
 		}
 	else{
-		C3794_Status = 0;	//C37.94 Logic NOT Available - Do NOT R/W or lock-up will occur
+		C3794_State = 0;	//C37.94 Logic NOT Available - Do NOT R/W or lock-up will occur
 		D(1, BUG("C37.94 NOT AVAILABLE:  Clock Failed to Start!\n"));
 		}
 }
@@ -252,6 +267,6 @@ unsigned int tmpint;	//was char in prev ver
 
 
 //*************************************************************************
-//* Copyright (c) 2017 Greenlee Communications Vista, USA.    			  *
+//* Copyright (c) 2017 Greenlee Communications Vista, CA USA.    		  *
 //* All rights reserved.                                                  *
 //*************************************************************************

@@ -45,7 +45,6 @@ C_SRCS += onesec_alrm.c
 C_SRCS += c37dot94bert.c
 C_SRCS += cfg_c37.c
 C_SRCS += c37dot94_task.c
-C_SRCS += BERTP.C
 CXX_SRCS :=
 ASM_SRCS :=
 

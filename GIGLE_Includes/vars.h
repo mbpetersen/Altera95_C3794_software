@@ -63,7 +63,7 @@ unsigned char	GIGE_STATUS=0; // passed into [GIGERESULT_ptr]
 //	C3794 variables
 //_______________________________________
 unsigned char	ConfigStatC37[MaxStatus];
-unsigned char	C3794_Status=0;
+unsigned char	C3794_State=0, C3794_status=0;
 signed short	PPM_offset=0;
 _Bool 	BERT_SYNC = 0,BERT_INVERT=0;
 _Bool	ERRORS_LED=0, HISTORY_LED=0;
