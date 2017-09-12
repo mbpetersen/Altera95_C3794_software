@@ -68,42 +68,57 @@ void set_RCV_N_CHANNELS(unsigned char value) {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RCV_N_CHANNELS, value);
 }
 
-int LOS_WATCHDOG_LIMIT = 5000;
+int LOS_WATCHDOG_LIMIT = 500;
 
 void wait_for_LOS_GOOD()
 {
 	unsigned int status_reg;
 	unsigned int watchdog_timer = 0;
 
-	status_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	while ((status_reg & LOS_STATUS_MASK) != (LOS_INACTIVE << LOS_STATUS_OFS)) {
+	update_alarms_event_status();
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	//while ((status_reg & LOS_STATUS_MASK) != (LOS_INACTIVE << LOS_STATUS_OFS)) {
+	while (LOS_ACTIVE) { //while LOS is Active ( == 0x04)
 		if (watchdog_timer >= LOS_WATCHDOG_LIMIT) {
 			D(1, BUG("\n\t	LOS_WATCHDOG TIMEOUT"));
 			break;
-		}
-		OSTimeDlyHMSM(0, 0, 0, 1);  //wait 1mS
+			}
+		OSTimeDlyHMSM(0, 0, 0, 10);  //wait 10mS
 		watchdog_timer++;
-		status_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	}
+		update_alarms_event_status();
+		}
+	if(LOS_ACTIVE){
+		D(1, BUG("\n\t	NO SIGNAL FOUND!  (in %d mS)",watchdog_timer*10));
+		}
+	else{
+		D(1, BUG("\n\t	SIGNAL DETECTED!  (in %d mS)",watchdog_timer*10));
+		}
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 }
 
-int RCV_CLOCK_WATCHDOG_LIMIT = 5000;
-
+int RCV_CLOCK_WATCHDOG_LIMIT = 500;
 void wait_for_rcv_clock_locked()
 {
-	unsigned int status_reg;
 	unsigned int watchdog_timer = 0;
 
-	status_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	while ((status_reg & CLOCK_STATUS_MASK) != (LOCKED << CLOCK_STATUS_OFS)) {
+	update_alarms_event_status();
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	while (RCVCLOCK_NOTLOCKED) {
 		if (watchdog_timer >= RCV_CLOCK_WATCHDOG_LIMIT) {
 			D(1, BUG("\n\t	RCV_CLOCK_WATCHDOG TIMEOUT"));
 			break;
-		}
-		OSTimeDlyHMSM(0, 0, 0, 1);  //wait 1mS
+			}
+		OSTimeDlyHMSM(0, 0, 0, 10);  //wait 10mS
 		watchdog_timer++;
-		status_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	}
+		update_alarms_event_status();
+		}
+	if(RCVCLOCK_LOCKED){
+		D(1, BUG("\n\t	RCV_CLOCK Locked!  (in %d mS)",watchdog_timer*10));
+		}
+	else{
+		D(1, BUG("\n\t	No LOCK on RCV Clock!  (in %d mS)",watchdog_timer*10));
+		}
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 }
 
 
@@ -129,7 +144,7 @@ void dump_C3794_status() {
 
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
 	D(1, BUG("\n\tINFO: C3794 STATUS register: 0x%02x", temp));
-	D(1, BUG("\nRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT_CNT);
 	D(1, BUG("\tINFO: C3794 LOS_DETECT_CNT_  register: %d\n", temp));
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_NUMFRMS_ACTIVE);
@@ -140,6 +155,15 @@ void dump_C3794_status() {
 	D(1, BUG("\tINFO: C3794 RDI_ACTIVE_#FRMS register: %d\n", temp));
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_TX);
 	D(1, BUG("\tINFO: C3794 FRAMES_TX'D: %d	FRAMES_RX'D: %d \n", temp, IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_RX)));
+}
+void clear_C3794_counters()
+{
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT_CNT, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_NUMFRMS_ACTIVE, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_DETECT_CNT, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_NUMFRMS_ACTIVE, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_RX, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_TX, 0);
 }
 
 /// TODO

@@ -61,60 +61,72 @@ alt_u32 handle_one_sec_alarm(void)
 			tmplong = 0xFFFF0000;
 		SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,tmplong);
 
-		if(tmplong==2){
+/*
+		if(tmplong==6){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			issue_UI_command(BERTC37_ptr,Poly2047);	//Emulate UI command
 			}
+
+		else if(tmplong==4){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			clear_C3794_counters();
+			}
+		//
 		else if(tmplong==8){	// 24secs in...
 			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
 			//stop_BERT_test();
 			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
 			}
+		//
 		else if(tmplong==9){	// 24secs in...
-			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			//start_BERT_test();
 			issue_UI_command(BERTC37_ptr,Poly511);	//Emulate UI command
 			}
-		else if(tmplong==11){	// 24secs in...
-			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
-			//stop_BERT_test();
-			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
-			}
 		else if(tmplong==12){	// 24secs in...
-			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			//start_BERT_test();
 			issue_UI_command(BERTC37_ptr,Alt);	//Emulate UI command
 			}
-		else if(tmplong==14){	// 24secs in...
-			D(1, BUG("\n\t....STOP BERT...")); // TMP DEBUG DISPLAY
-			//stop_BERT_test();
-			issue_UI_command(BERTC37_ptr,BertOFF);	//Emulate UI command
-			}
-		else if(tmplong==15){	// 24secs in...
-			D(1, BUG("\n\t....START BERT...")); // TMP DEBUG DISPLAY
+		else if(tmplong==16){	// 24secs in...
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			//start_BERT_test();
-			issue_UI_command(BERTC37_ptr,TwoIn8);	//Emulate UI command
+			issue_UI_command(BERTC37_ptr,OneIn8);	//Emulate UI command
 			}
-		else if(tmplong==23){	// 23secs in...
+		else if(tmplong==21){	// 24secs in...
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,Poly2047);	//Emulate UI command
+			}
+//
+		else if(tmplong==36){	// 23secs in...
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			clear_internal_loopback();
 			D(1, BUG("\n\t....CLR INTL LPBK...")); // TMP DEBUG DISPLAY
 			}
-		else if(tmplong==24){	// 24secs in...
+		else if(tmplong==38){	// 24secs in...
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			D(1, BUG("\n\t....SET INTL LPBK...")); // TMP DEBUG DISPLAY
 			set_internal_loopback();
+			//clear_C3794_counters();
 			}
-
+//
+ *
+ */
 
 
 		//update_alarms_event_status();// moved to main task....
 		if(ERRORS_LED == ON)	// if we had an error previously then turn it off
 			ERRORS_LED = OFF;
 
-		if(tmplong%5==0){
-			RxBuffer[MISCC37_ptr] ^= 0x80;	// "set" UI insert Error bit
-			issue_UI_command(MISCC37_ptr, RxBuffer[MISCC37_ptr]);	//Emulate UI command
+
+		if(tmplong > 10000 && tmplong%10==0){
+//			RxBuffer[MISCC37_ptr] ^= 0x80;	// "set" UI insert Error bit
+//			issue_UI_command(MISCC37_ptr, RxBuffer[MISCC37_ptr]);	//Emulate UI command
 			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			dump_C3794_status(); // TMP DEBUG DISPLAY
 			}
+
 		process_alarms_events();
 
 		if(BERT != 0){			// if BERT is on and running poll errors
@@ -152,8 +164,8 @@ void process_bert_errors()
 
 
 	if(LOS_ACTIVE){	// If we're in LOS
-		D(1, BUG("\nIn Process_BERT errors(): in LOS_ACTIVE"));
 		if(BERT_STATE&0x80){   		// if we were in SYNC (or PatLOST)
+			D(1, BUG("\nIn Process_BERT errors(): LOS_ACTIVE so Dropping BERT SYNC"));
 			BERT_STATE |= 0x40; 	// flag loss of LOCK condition
 			Misc_stat37 |= 0x01;    // Send a Bleep in PDA
 			ConfigStatC37[MISC_STATC37_ptr] = Misc_stat37;

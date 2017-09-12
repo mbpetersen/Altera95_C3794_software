@@ -23,6 +23,7 @@ void init_c37dot94();
 void verify_register(unsigned int addr, unsigned int expected, unsigned int mask);
 void transition_register_bit(unsigned int addr, unsigned int mask);
 void dump_C3794_status();
+void clear_C3794_counters();
 void set_internal_loopback();
 void clear_internal_loopback();
 void set_far_end_loopback();

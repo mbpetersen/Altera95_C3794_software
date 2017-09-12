@@ -4,6 +4,23 @@
 #include "gigle.h"
 #include "extvars.h"
 
+unsigned char bert_str[17][12]={"BERT OFF",
+  	 				"Poly511",
+  	 				"Poly2047",
+  	 				"Poly2e15",
+  	 				"Poly2e20",
+  	 				"Poly2e23",
+  	 				"PolyQRSS",
+  	 				"Poly63",
+  	 				"All-1's",
+  	 				"All-0's",
+  	 				"Alt 1:1",
+  	 				"3in24",
+  	 				"1in8 (1:7)",
+  	 				"2in8",
+  	 				"1in5",
+  	 				"1in6",
+  	 				"PolyV54"};
 
 void config_c37_hw()
 {
@@ -76,13 +93,12 @@ unsigned long LongInt=0;
   	 				//ConfigStatC37[Lpbk_ptr] = 0;
   	 				break;
 
-
   	 			case BERTC37_ptr: 			//13	// pattern
   	 				//ConfigStatC37[BERTC37_ptr] = 0;
 					BERT = RxBuffer[BERTC37_ptr];
 					//write_bertP();
 					if(BERT!=0){
-						D(1, BUG("\n Starting BERT Test"));
+						D(1, BUG("\n Starting BERT Test: %s",bert_str[BERT]));
 						set_test_pattern();
 						restart_bert(); // flush errors and set ELAP to 0
 						BERT_STATE &= ~0xC0;	// clear Sync state machine on new pattern
@@ -101,6 +117,7 @@ unsigned long LongInt=0;
 				   		restart_bert();
 				     	ConfigStatC37[BSR_ptr] = BERT_STATE;
 				   		//restart_history();	// use below for now....
+				     	clear_C3794_counters();
 				   		SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,0); // Clear ET Clock
 				   		}
   	 				break;

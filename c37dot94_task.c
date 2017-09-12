@@ -64,18 +64,17 @@ void c37dot94_task(void* pdata)
 void init_debug_test()
 {
 	//================================================================
-	//D(1, BUG("\n\t FAR END LOOPBACK ENABLED\n"));
-	//set_far_end_loopback();
-	set_internal_loopback();  D(1, BUG("\n\t INTL LOOPBACK ENABLED\n"));
+	//set_far_end_loopback();	D(1, BUG("\n\t FAR END LOOPBACK ENABLED\n"));
+//	set_internal_loopback();  D(1, BUG("\n\t INTL LOOPBACK ENABLED\n"));
 	// set IDLE code byte to something other than default of AIS.
 	set_IDLE_code((unsigned char)0xFF);	D(1, BUG("\n\t IDLE CODE SET\n"));  // 0xC3:   1100,0011
 	// set xmit and rcv channel numbers to 12
-	set_XMT_N_CHANNELS(9);  D(1, BUG("\n\t N channels set\n"));
-	set_RCV_N_CHANNELS(9);   D(1, BUG("\n\t N RCV channels set\n"));
+	set_XMT_N_CHANNELS(2);			D(1, BUG("\n\t N channels set\n"));
+	set_RCV_N_CHANNELS(2);			D(1, BUG("\n\t N RCV channels set\n"));
 
 	// wait for receive clock to lock, and good framing pattern to be found
-	wait_for_rcv_clock_locked();  D(-1, BUG("\n\t RCV clock locked\n"));
-	wait_for_LOS_GOOD();    D(1, BUG("\n\t LOS GOOD\n"));
+//	wait_for_rcv_clock_locked();
+//	wait_for_LOS_GOOD();
 
 	// load a test pattern via registers
 	//BERT = Poly2047;
