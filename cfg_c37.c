@@ -79,10 +79,12 @@ unsigned long LongInt=0;
   	 				break;
 
   	 			case TX_CHANS_ptr:    	//9	range:1-12
+  	 				D(1, BUG("\n In cfg_c37() setting Tx chans"));
   	 				//ConfigStatC37[TX_CHANS_ptr] = 1;
   	 				set_XMT_N_CHANNELS(RxBuffer[i]);
   	 				break;
   	 			case RX_CHANS_ptr:    	//10 range:1-12
+  	 				D(1, BUG("\n In cfg_c37() setting Rx chans"));
   	 				//ConfigStatC37[RX_CHANS_ptr] = 1;
   	 				set_RCV_N_CHANNELS(RxBuffer[i]);
   	 				break;
@@ -98,13 +100,13 @@ unsigned long LongInt=0;
 					BERT = RxBuffer[BERTC37_ptr];
 					//write_bertP();
 					if(BERT!=0){
-						D(1, BUG("\n Starting BERT Test: %s",bert_str[BERT]));
+						D(1, BUG("\n In cfg_c37(): Starting BERT Test: %s",bert_str[BERT]));
 						set_test_pattern();
 						restart_bert(); // flush errors and set ELAP to 0
 						BERT_STATE &= ~0xC0;	// clear Sync state machine on new pattern
 						}
 					else{ // BERT==0
-						D(1, BUG("\n Stopping BERT Test"));
+						D(1, BUG("\n In cfg_c37(): Stopping BERT Test"));
 						stop_BERT_test();	//TEMP for now
 						//set_XMT_N_CHANNELS(0);
 						//set_test_pattern();	//call set_test_pattern with V54 and set TxCHANS to 0.
@@ -114,6 +116,7 @@ unsigned long LongInt=0;
   	 			case CLEARC37_ptr:    		//14	// RESTART^0, clear gTimesUp flag^1, PDA_ACK^7 to LOCAL_CHG (misc_stat^6)
   	 				//ConfigStatC37[CLEARC37_ptr] = 0;
 					if(((RxBuffer[CLEARC37_ptr])&0x01) != ((ConfigStatC37[CLEARC37_ptr])&0x01)){
+						D(1, BUG("\n In cfg_c37(): RESTARTING BERT & CNTRS"));
 				   		restart_bert();
 				     	ConfigStatC37[BSR_ptr] = BERT_STATE;
 				   		//restart_history();	// use below for now....
@@ -126,7 +129,7 @@ unsigned long LongInt=0;
   	 				//ConfigStatC37[MISCC37_ptr] = 0;
 					//*** if INSERT LOGIC ERROR .....do it!
 					if(((RxBuffer[MISCC37_ptr])&0x80) != ((ConfigStatC37[MISCC37_ptr])&0x80)){ // if MISC - Insert Logic error is set
-						D(1, BUG("\n Inserting BERT Bit Error"));
+						D(1, BUG("\n In cfg_c37(): Inserting BERT Bit Error"));
 						Insert_BERT_biterror();
 						}
 
@@ -149,6 +152,7 @@ unsigned long LongInt=0;
 
   	 			case BER_ptr:			//16	// set BER
   	 				//ConfigStatC37[BER_ptr] = 0;
+  	 				D(1, BUG("\n In cfg_c37(): Setting BER to %d",(RxBuffer[i])&0x07));
   	 				set_C3794_BER((RxBuffer[i])&0x07);	// Clip to: 0 through 7,  10^0->10^-7
   	 				break;
   	 			case UserSize_ptr:		//17	// User BERT pattern size (1-32 bits)

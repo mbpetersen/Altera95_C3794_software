@@ -98,17 +98,33 @@ void Insert_BERT_biterror()
 	transition_register_bit(ADDR_FRC_ERR, FRC_SBE_MASK);
 }
 
+void latch_BERT_counts()
+{
+	transition_register_bit(ADDR_CTL, CTL_LC_MASK);
+}
+
+unsigned long get_BERT_rcv_pattern()
+{
+	unsigned long prrdata;
+	transition_register_bit(ADDR_CTL, CTL_RL_MASK);
+
+	prrdata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_PRR);
+	D(1, BUG("\nBERT PRR: %0lX\n", prrdata));
+	//return (IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_PRR));
+	return prrdata;
+}
+
 void read_C3794_BERT_counts()
 {
 	unsigned long long bit_count_reg;
 	unsigned int bit_error_count_reg;
 
-	transition_register_bit(ADDR_CTL, CTL_LC_MASK);
+	latch_BERT_counts();
 	bit_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_H);
 	bit_count_reg = (bit_count_reg << 32);
 	bit_count_reg += IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_L);
 	bit_error_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_ERROR_COUNT);
-    D(-1, BUG("Bit count: %llu, Bit error count: %u, BER: %4.3e\n", bit_count_reg, bit_error_count_reg, (bit_error_count_reg/(double)bit_count_reg)));
+    D(1, BUG("Bit count: %llu, Bit error count: %u, BER: %4.3e\n", bit_count_reg, bit_error_count_reg, (bit_error_count_reg/(double)bit_count_reg)));
 }
 
 void load_test_pattern()
@@ -141,7 +157,7 @@ void stop_BERT_test()
 /*********************************************************/
 void restart_bert()
 {
-	transition_register_bit(ADDR_CTL, CTL_LC_MASK); // pulse to latch counts
+	latch_BERT_counts();
 
 	SaveBytesLong(ConfigStatC37,BECR3_ptr,0);			// Clear BERT Counters
 	SaveBytesInt(ConfigStatC37,BERT_ES1_ptr,0);
@@ -165,9 +181,10 @@ void restart_bert()
 //												if [BSR_ptr]&0xC0==0x80 is SYNC
 //												if [BSR_ptr]&0xC0==0xC0 is PatLOST
 //********************************************************************************
-#define BERT_INSYNC	((IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS))&SYNC_STATUS_MASK)
 void process_bert_sync()		//** BERT SYNC verification Processing **
 {
+	//update_bert_status(); PSIR may have nothing to do with BERT's !!!
+
 	//********************************************************
 	//*** Handle BERT SYNC state changes and flag GUI	 ***
 	//********************************************************************************
@@ -401,8 +418,8 @@ unsigned int i=0;
 	set_RCV_N_CHANNELS(9);   //D(1, BUG("\n\t N RCV channels set\n"));
 
 	// wait for receive clock to lock, and good framing pattern to be found
-	wait_for_rcv_clock_locked();  //D(-1, BUG("\n\t RCV clock locked\n"));
-	wait_for_LOS_GOOD();    //D(1, BUG("\n\t LOS GOOD\n"));
+	wait_for_rcv_clock_locked();  //D(1, BUG("\n\t RCV clock locked\n"));
+	wait_for_FrameSync();    //D(1, BUG("\n\t LOS GOOD\n"));
 
 	// load a test pattern via registers
 	BERT = Poly2047;
@@ -456,7 +473,7 @@ void run_C3794_BERT_test2()
 
 	unsigned short c3794_delay_cnt=0;
 
-	D(-1, BUG("\n\t	=========== C3794 BERT TEST2, applied BER: 1.0e-5 (20 second test) ======================\n"));
+	D(1, BUG("\n\t	=========== C3794 BERT TEST2, applied BER: 1.0e-5 (20 second test) ======================\n"));
 
 	set_internal_loopback();
 	// set IDLE code byte to something other than default of AIS.
@@ -467,7 +484,7 @@ void run_C3794_BERT_test2()
 
 	// wait for receive clock to lock, and good framing pattern to be found
 	wait_for_rcv_clock_locked();
-	wait_for_LOS_GOOD();
+	wait_for_FrameSync();
 
 	// load a test pattern via registers
 	BERT = ThreeIn24;
@@ -502,7 +519,7 @@ void run_C3794_BERT_test3()
 
 	unsigned short c3794_delay_cnt=0;
 
-	D(-1, BUG("\n\t	=========== C3794 BERT TEST3, Single bit error, BER: 2.64e-7 (60 second test) ======================\n"));
+	D(1, BUG("\n\t	=========== C3794 BERT TEST3, Single bit error, BER: 2.64e-7 (60 second test) ======================\n"));
 
 	set_internal_loopback();
 	// set IDLE code byte to something other than default of AIS.
@@ -513,7 +530,7 @@ void run_C3794_BERT_test3()
 
 	// wait for receive clock to lock, and good framing pattern to be found
 	wait_for_rcv_clock_locked();
-	wait_for_LOS_GOOD();
+	wait_for_FrameSync();
 
 	// load a test pattern via registers
 	BERT = ThreeIn24;

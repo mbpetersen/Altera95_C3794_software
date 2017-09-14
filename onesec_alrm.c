@@ -61,12 +61,47 @@ alt_u32 handle_one_sec_alarm(void)
 			tmplong = 0xFFFF0000;
 		SaveBytesLong(ConfigStatC37,C37SECONDS3_ptr,tmplong);
 
-/*
+
 		if(tmplong==6){
 			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			issue_UI_command(BERTC37_ptr,Poly2047);	//Emulate UI command
 			}
-
+		else if(tmplong==16){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,OneIn8);	//Emulate UI command
+			}
+		else if(tmplong==26){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,OneIn5);	//Emulate UI command
+			}
+		else if(tmplong==36){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,ThreeIn24);	//Emulate UI command  ThreeIn24
+			}
+		else if(tmplong==46){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,All1);	//Emulate UI command
+			}
+		else if(tmplong==56){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,ALL0);	//Emulate UI command
+			}
+		else if(tmplong==66){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,Alt);	//Emulate UI command
+			}
+		else if(tmplong==76){
+			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
+			//start_BERT_test();
+			issue_UI_command(BERTC37_ptr,Poly511);	//Emulate UI command
+			}
+/*
 		else if(tmplong==4){
 			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			clear_C3794_counters();
@@ -120,11 +155,13 @@ alt_u32 handle_one_sec_alarm(void)
 			ERRORS_LED = OFF;
 
 
-		if(tmplong > 10000 && tmplong%10==0){
+		if(tmplong%5 == 0){
 //			RxBuffer[MISCC37_ptr] ^= 0x80;	// "set" UI insert Error bit
 //			issue_UI_command(MISCC37_ptr, RxBuffer[MISCC37_ptr]);	//Emulate UI command
 			D(1, BUG("\nELAP: %lu secs", tmplong)); // TMP DEBUG DISPLAY
 			dump_C3794_status(); // TMP DEBUG DISPLAY
+			//get_BERT_rcv_pattern();
+			load_RCVD_FRAME();
 			}
 
 		process_alarms_events();
@@ -141,19 +178,6 @@ alt_u32 handle_one_sec_alarm(void)
 }
 
 
-//Update Alarm & Events Flags
-/**
-#define RCVCLOCK_LOCKED	(C3794_status&CLOCK_STATUS_MASK) == CLOCK_STATUS_MASK
-#define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
-#define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
-#define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
-#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
- */
-void update_alarms_event_status()
-{
-	C3794_status = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
-	//D(1, BUG("\nC3794_status_reg: %0X", C3794_status));
-}
 
 //_____________________________________________________________________________
 void process_bert_errors()
@@ -163,7 +187,7 @@ void process_bert_errors()
 	unsigned int tmpint=0;
 
 
-	if(LOS_ACTIVE){	// If we're in LOS
+	if(LOF_ACTIVE){	// If we're in LOS
 		if(BERT_STATE&0x80){   		// if we were in SYNC (or PatLOST)
 			D(1, BUG("\nIn Process_BERT errors(): LOS_ACTIVE so Dropping BERT SYNC"));
 			BERT_STATE |= 0x40; 	// flag loss of LOCK condition
@@ -174,7 +198,7 @@ void process_bert_errors()
 
 	// BERT is ON
 	if(BERT_STATE&0x80){	// If BERT ON and we're in qualified SYNC
-		transition_register_bit(ADDR_CTL, CTL_LC_MASK);		// load error counters
+		latch_BERT_counts();
 		//bit_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_H);
 		//bit_count_reg = (bit_count_reg << 32);
 		//bit_count_reg += IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_L);
@@ -253,10 +277,13 @@ void process_alarms_events()
 	//***************************************************************
 	SaveBytesInt(ConfigStatC37,LOS_COUNT1_ptr,LOSCNT); 	// ALARM CNTR's inc in intr
 
-	if(LOS_ACTIVE){                    // We have LOS so...
-		tmpint = BytesToInt(ConfigStatC37,LOS_SEC1_ptr); 	// get current CNT
-		tmpint++;							 				// Inc LOS-seconds CNT
-		SaveBytesInt(ConfigStatC37,LOS_SEC1_ptr,tmpint); 	// Save into Status array
+	//Waiting for LOS indicator.....
+	//tmpint = BytesToInt(ConfigStatC37,OOF_SEC1_ptr); 	// get current CNT
+
+	if(LOF_ACTIVE){                    // We have LOS so...
+		tmpint = BytesToInt(ConfigStatC37,OOF_SEC1_ptr); 	// get current CNT
+		tmpint++;							 				// Inc OOF-seconds CNT
+		SaveBytesInt(ConfigStatC37,OOF_SEC1_ptr,tmpint); 	// Save into Status array
 		ERRORS_LED = LED_ON;
 		HISTORY_LED = LED_ON;
 		//History = YES; 	//this history is used as history of only alarms & events (excluding BERTS)
@@ -266,7 +293,7 @@ void process_alarms_events()
 
 //#define ADDR_BAD_FRAMES_RX          0x078 // (wd add 0x1e)    // Found error in any frame
 //#define ADDR_BAD_FRAMES_PER_SEC     0x07c // (wd add 0x1f)    // Bad frames per second, always updating
-/** definition pending clarification from OnCore
+/** definition clarification from OnCore: 9/14: LOS is really LOF (OOF), LOS in process.....
 	if(InOOF){
 		tmpint = BytesToInt(ConfigStatC37,OOF_SEC1_ptr); 	// get current CNT
 		tmpint++;							 			// Inc OOF-seconds CNT

@@ -26,6 +26,7 @@ void c37dot94_task(void* pdata)
 		D(1, BUG(" CLOCK up & running! \n"));
 		//OSTaskResume(C3794_TASK_PRIORITY);
 //		reinit_c37dot94();
+		init_c37dot94();
 		init_debug_test();
 		}
 	else{
@@ -69,8 +70,12 @@ void init_debug_test()
 	// set IDLE code byte to something other than default of AIS.
 	set_IDLE_code((unsigned char)0xFF);	D(1, BUG("\n\t IDLE CODE SET\n"));  // 0xC3:   1100,0011
 	// set xmit and rcv channel numbers to 12
-	set_XMT_N_CHANNELS(2);			D(1, BUG("\n\t N channels set\n"));
-	set_RCV_N_CHANNELS(2);			D(1, BUG("\n\t N RCV channels set\n"));
+	ConfigStatC37[TX_CHANS_ptr] = 6;
+	ConfigStatC37[RX_CHANS_ptr] = 6;
+	RxBuffer[TX_CHANS_ptr] = ConfigStatC37[TX_CHANS_ptr];
+	RxBuffer[RX_CHANS_ptr] = ConfigStatC37[RX_CHANS_ptr];
+	set_XMT_N_CHANNELS(ConfigStatC37[RX_CHANS_ptr]);
+	set_RCV_N_CHANNELS(ConfigStatC37[RX_CHANS_ptr]);
 
 	// wait for receive clock to lock, and good framing pattern to be found
 //	wait_for_rcv_clock_locked();

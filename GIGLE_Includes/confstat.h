@@ -1590,7 +1590,59 @@ and the associated frame type settings like how long the hdr is, where the IPv4 
 #define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
 #define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
 #define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
-#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
+#define LOF_ACTIVE		(C3794_status&LOF_STATUS_MASK) != LOF_STATUS_MASK	// ActvL
+
+//* BERT definitions
+// "DS2172" equivalent BERT status register
+#define SYNC	(BERT_STATUS&0x01)	//Real time status of the synchronizer (this bit is not latched). Will be set when synchronization is declared.
+									//   Will be cleared when 6 or more bits out of 64 are received in error (if PCR.2 = 0).
+//BECOF SR.1 Bit Error Count Overflow. Set when the 32-bit BECR overflows.
+//BCOF SR.2 Bit Counter Overflow. Set when the 32-bit BCR overflows.
+//BED SR.3 Bit Error Detection. Set when bit errors are detected.
+#define RLOS	(BERT_STATUS&0x10)	//Receive Loss Of Sync. Set when the device is searching for synchronization. Once sync is achieved, will remain set until read.
+#define RALL0	(BERT_STATUS&0x20)	//Receive All Zeros. Set when 32 consecutive 0s are received; allowed to be cleared when a 1 is received.
+#define RALL1	(BERT_STATUS&0x40)	//Receive All Ones. Set when 32 consecutive 1s are received; allowed to be cleared when a 0 is received.
+#define RA1A0	(BERT_STATUS&0x60)	// receive either All1's or All0's
+//- SR.7 Not Assigned. Could be any value when read.
+
+#define SYNCINCNT	3
+#define SYNCOUTCNT	3
+
+//Misc_stat37
+#define gBleep   (gStatus[MISC_STATC37_ptr]&0x01)	// Bleeeeeep....
+#define gErrors  (gStatus[MISC_STATC37_ptr]&0x02)	// ERRORS LED
+#define gHistory (gStatus[MISC_STATC37_ptr]&0x04)	// HISTORY LED
+#define gTweedle (gStatus[MISC_STATC37_ptr]&0x08)	// Lpbk/Sync sound....
+#define gTimesUp (gStatus[MISC_STATC37_ptr]&0x10)	// Timed test IVL complete!
+#define gLocalChg (gStatus[MISC_STATC37_ptr]&0x40)	// LOCAL change performed by MOD (for now just a Bert)
+
+typedef enum {
+	BertOFF,			//configures to V54
+	Poly511,
+	Poly2047,
+	Poly2e15,
+
+	Poly2e20,
+	Poly2e23,
+
+	PolyQRSS,
+
+	Poly63,
+
+	All1,       // all 1's
+	ALL0,       // all 0's
+	Alt,       // Alternating 1010...
+	ThreeIn24, // 0010_0000_0000_0000_0010_0010
+	OneIn8,    // 0000_0001  same as 1:7
+	TwoIn8,    // 0100_0010
+
+	OneIn5,    // 0100_0010 0x00000010
+	OneIn6,     // 0100_0010 0x00000020
+
+	PolyV54
+} BERT_Patterns;
+
+
 
 /*********************************************************************/
 /********** Configuration Bytes from UI to C37.94 "Module" ***********/
@@ -1608,7 +1660,6 @@ and the associated frame type settings like how long the hdr is, where the IPv4 
 #define RX_CHANS_ptr    	10
 #define OVH_errors_ptr		11	// insert OVH errors: F-bits/BPV's, etc.
 #define Lpbk_ptr      		12	// Loopback Up/Down
-
 
 #define BERTC37_ptr 		13	// pattern
 #define CLEARC37_ptr    	14	// RESTART^0, clear gTimesUp flag^1, PDA_ACK^7 to LOCAL_CHG (misc_stat^6)
@@ -1694,50 +1745,6 @@ and the associated frame type settings like how long the hdr is, where the IPv4 
 #define C37SECONDS1_ptr MaxConfig+76
 #define C37SECONDS0_ptr MaxConfig+77
 
-typedef enum {
-	BertOFF,			//configures to V54
-	Poly511,
-	Poly2047,
-	Poly2e15,
-
-	Poly2e20,
-	Poly2e23,
-
-	PolyQRSS,
-
-	Poly63,
-
-	All1,       // all 1's
-	ALL0,       // all 0's
-	Alt,       // Alternating 1010...
-	ThreeIn24, // 0010_0000_0000_0000_0010_0010
-	OneIn8,    // 0000_0001  same as 1:7
-	TwoIn8,    // 0100_0010
-
-	OneIn5,    // 0100_0010 0x00000010
-	OneIn6,     // 0100_0010 0x00000020
-
-	PolyV54
-} BERT_Patterns;
-
-//********************************
-//* BERT definitions
-//********************************
-#define SYNC	(BERT_STATUS&0x01)   // 2172 BERT status register
-#define RLOS	(BERT_STATUS&0x10)
-#define RA1A0	(BERT_STATUS&0x60)
-#define RALL1	(BERT_STATUS&0x40)
-#define RALL0	(BERT_STATUS&0x20)
-#define SYNCINCNT	3
-#define SYNCOUTCNT	3
-
-//Misc_stat37
-#define gBleep   (gStatus[MISC_STATC37_ptr]&0x01)	// Bleeeeeep....
-#define gErrors  (gStatus[MISC_STATC37_ptr]&0x02)	// ERRORS LED
-#define gHistory (gStatus[MISC_STATC37_ptr]&0x04)	// HISTORY LED
-#define gTweedle (gStatus[MISC_STATC37_ptr]&0x08)	// Lpbk/Sync sound....
-#define gTimesUp (gStatus[MISC_STATC37_ptr]&0x10)	// Timed test IVL complete!
-#define gLocalChg (gStatus[MISC_STATC37_ptr]&0x40)	// LOCAL change performed by MOD (for now just a Bert)
 
 // C37.94 Frame: 256 bits  256bits at 8kHz rate = 2.048Mbps  256/8=32bytes total
 // Header	16bits		abcdefgh,00001111

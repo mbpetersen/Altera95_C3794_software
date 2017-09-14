@@ -62,38 +62,82 @@ void set_IDLE_code(unsigned char value) {
 
 void set_XMT_N_CHANNELS(unsigned char value) {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_XMT_N_CHANNELS, value);
+	D(1, BUG("\n\t XMT N channels set to %d\n", value));
 }
 
 void set_RCV_N_CHANNELS(unsigned char value) {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RCV_N_CHANNELS, value);
+	D(1, BUG("\n\t RCV N channels set to %d\n", value));
 }
 
-int LOS_WATCHDOG_LIMIT = 500;
-
-void wait_for_LOS_GOOD()
+void load_RCVD_FRAME()
 {
-	unsigned int status_reg;
+	unsigned long framedata=0;
+	unsigned short i=0;
+
+	transition_register_bit(ADDR_CTL, CTL_RWLB_MASK);	// latch in new frame(s) content
+
+	//Wait for FrameWindow Data to be ready: CTL_RWLB_MASK bit clear...
+	framedata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_CTL);
+	while((framedata&CTL_RWLB_MASK) != CTL_RWLB_MASK && ++i < 10){ // should be ready in <250uS (512 bits @ 2.048M) - give him 1500uS
+		usleep(150);
+		framedata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_CTL);
+		}
+	if(i==10){
+		D(1, BUG("\nReceived Frame Window TIMEOUT:  Not ready in 1.5mS!!"));
+		}
+
+	//HDR1_ptr +0-31  (32 total bytes)
+	D(1, BUG("\nReceived Frame1 Content: "));
+	for(i=0;i<8;i++){
+		//SaveBytesLong(ConfigStatC37, HDR1_ptr+(i*4), IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RCV_WINDOW_BASE+i));
+		framedata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RCV_WINDOW_BASE+i);
+		D(1, BUG("%0lX ", framedata));
+		SaveBytesLong(ConfigStatC37, HDR1_ptr+(i*4), IORD_32DIRECT(TOP_C37DOT94_0_BASE, framedata));
+		}
+
+	get_BERT_rcv_pattern();	//Check BERT PRR register as well to confirm it matches (somewhat) the content seen in the Frame (it should)
+
+	//Eyeball Second Frame for debugging
+	D(1, BUG("\nReceived Frame2 Content: "));
+	for(i=8;i<16;i++){
+		framedata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RCV_WINDOW_BASE+i);
+		D(1, BUG("%0lX ", framedata));
+		}
+	D(1, BUG("\n"));
+
+	get_BERT_rcv_pattern();
+
+}
+
+
+
+
+
+int LOF_WATCHDOG_LIMIT = 500;
+void wait_for_FrameSync()
+{
 	unsigned int watchdog_timer = 0;
 
 	update_alarms_event_status();
-	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
-	//while ((status_reg & LOS_STATUS_MASK) != (LOS_INACTIVE << LOS_STATUS_OFS)) {
-	while (LOS_ACTIVE) { //while LOS is Active ( == 0x04)
-		if (watchdog_timer >= LOS_WATCHDOG_LIMIT) {
-			D(1, BUG("\n\t	LOS_WATCHDOG TIMEOUT"));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOF_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOF_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	//while ((status_reg & LOF_STATUS_MASK) != (LOF_INACTIVE << LOF_STATUS_OFS)) {
+	while (LOF_ACTIVE) { //while LOF is Active ( == 0x04)
+		if (watchdog_timer >= LOF_WATCHDOG_LIMIT) {
+			D(1, BUG("\n\t	FRAME SYNC TIMEOUT"));
 			break;
 			}
 		OSTimeDlyHMSM(0, 0, 0, 10);  //wait 10mS
 		watchdog_timer++;
 		update_alarms_event_status();
 		}
-	if(LOS_ACTIVE){
-		D(1, BUG("\n\t	NO SIGNAL FOUND!  (in %d mS)",watchdog_timer*10));
+	if(LOF_ACTIVE){
+		D(1, BUG("\n\t	CANNOT FRAME SYNC!  (in %d mS)",watchdog_timer*10));
 		}
 	else{
-		D(1, BUG("\n\t	SIGNAL DETECTED!  (in %d mS)",watchdog_timer*10));
+		D(1, BUG("\n\t	FRAME SYNC Obtained!  (in %d mS)",watchdog_timer*10));
 		}
-	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOF_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOF_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 }
 
 int RCV_CLOCK_WATCHDOG_LIMIT = 500;
@@ -102,7 +146,7 @@ void wait_for_rcv_clock_locked()
 	unsigned int watchdog_timer = 0;
 
 	update_alarms_event_status();
-	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOF_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOF_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 	while (RCVCLOCK_NOTLOCKED) {
 		if (watchdog_timer >= RCV_CLOCK_WATCHDOG_LIMIT) {
 			D(1, BUG("\n\t	RCV_CLOCK_WATCHDOG TIMEOUT"));
@@ -118,7 +162,7 @@ void wait_for_rcv_clock_locked()
 	else{
 		D(1, BUG("\n\t	No LOCK on RCV Clock!  (in %d mS)",watchdog_timer*10));
 		}
-	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOF_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOF_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
 }
 
 
@@ -132,23 +176,39 @@ void verify_register(unsigned int addr, unsigned int expected, unsigned int mask
 
 }
 
+//Update Alarm & Events Flags
 /*
 #define RCVCLOCK_LOCKED	(C3794_status&CLOCK_STATUS_MASK) == CLOCK_STATUS_MASK
 #define TEST_ACTIVE		(C3794_status&TEST_STATUS_MASK) == TEST_STATUS_MASK
 #define RDI_ACTIVE		(C3794_status&RDI_STATUS_MASK) != RDI_STATUS_MASK	// ActvL
 #define BERT_INSYNC		(C3794_status&SYNC_STATUS_MASK) == SYNC_STATUS_MASK
-#define LOS_ACTIVE		(C3794_status&LOS_STATUS_MASK) != LOS_STATUS_MASK	// ActvL
+#define LOF_ACTIVE		(C3794_status&LOF_STATUS_MASK) != LOF_STATUS_MASK	// ActvL
  */
+void update_alarms_event_status()
+{
+	C3794_status = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
+	//D(1, BUG("\nC3794_status_reg: %0X", C3794_status));
+}
+
+//This Register may be something completely different:
+//AWAITING DEFINITION...........
+void update_bert_status()
+{
+	BERT_STATUS = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_PSIR);
+	//D(1, BUG("\nC3794_status_reg: %0X", C3794_status));
+}
+
+
 void dump_C3794_status() {
 	unsigned int temp;
 
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_STATUS);
 	D(1, BUG("\n\tINFO: C3794 STATUS register: 0x%02x", temp));
-	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOS_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOS_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT_CNT);
-	D(1, BUG("\tINFO: C3794 LOS_DETECT_CNT_  register: %d\n", temp));
-	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_NUMFRMS_ACTIVE);
-	D(1, BUG("\tINFO: C3794 LOS_ACTIVE_#FRMS register: %d\n", temp));
+	D(1, BUG("\n\tRCVCLOCK_LOCKED:%d  TEST_ACTIVE:%d  LOF_ACTV:%d  RDI_ACTV:%d  BERT_INSYNC:%d\n",RCVCLOCK_LOCKED, TEST_ACTIVE, LOF_ACTIVE, RDI_ACTIVE, BERT_INSYNC));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOF_DETECT_CNT);
+	D(1, BUG("\tINFO: C3794 LOF_DETECT_CNT_  register: %d\n", temp));
+	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOF_NUMFRMS_ACTIVE);
+	D(1, BUG("\tINFO: C3794 LOF_ACTIVE_#FRMS register: %d\n", temp));
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_DETECT_CNT);
 	D(1, BUG("\tINFO: C3794 RDI_DETECT_CNT_  register: %d\n", temp));
 	temp = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_NUMFRMS_ACTIVE);
@@ -158,8 +218,8 @@ void dump_C3794_status() {
 }
 void clear_C3794_counters()
 {
-	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_DETECT_CNT, 0);
-	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOS_NUMFRMS_ACTIVE, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOF_DETECT_CNT, 0);
+	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_LOF_NUMFRMS_ACTIVE, 0);
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_DETECT_CNT, 0);
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_RDI_NUMFRMS_ACTIVE, 0);
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_NUM_FRAMES_RX, 0);
