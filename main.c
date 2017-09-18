@@ -250,7 +250,7 @@ void main_task(void* pdata)
 	XAUI_SERIAL_SELFLPBK(OFF);				// this is OFF after reset
 	loopback_xgxs_sys_10G_external_phy(OFF);	// this is OFF after reset
 	alt_alarm_start(&one_sec_alarm, one_sec_rate, handle_one_sec_alarm, 0);
-	alt_alarm_stop(&one_sec_alarm);
+	//alt_alarm_stop(&one_sec_alarm);
 	//tmpdata1 = read_ext_10G_phy(0xC001, 1);
 	//write_ext_10G_phy(0xC001, 1, tmpdata1 | 0x0080);	// use SREFCLK as input
 	//D(1, BUG("BOOOP:Checking PMA Vendor Specific Reg (1.C001)=%04lX\n", read_ext_10G_phy(0xC001, 1)));

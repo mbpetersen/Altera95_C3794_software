@@ -12,8 +12,9 @@
 
 // Format is PTR PLR PSR TINV RINV PS
 // The order of data must match the order in the enumeration.
-static int test_pattern_data[16][7] ={
+static int test_pattern_data[17][7] ={
 	//    PTR   PLR      PSR   Tinv Rinv PS USER_PAT     PS=1:qrw, 0:repetitive
+		{0x03, 0x06, 0xffffffff, 0,  0,  3, 0},  // BERT OFF (PolyV54)
 		{0x04, 0x08, 0xffffffff, 0,  0,  1, 0},  // Poly511
 		{0x08, 0x0A, 0xffffffff, 0,  0,  1, 0},  // Poly2047
 		{0x0D, 0x0E, 0xffffffff, 1,  1,  1, 0},  // Poly2e15
@@ -24,17 +25,17 @@ static int test_pattern_data[16][7] ={
 		{0x10, 0x13, 0xffffffff, 0,  0,  3, 0},  // PolyQRSS	// include QRSS_mask
 
 		{0x04, 0x05, 0xffffffff, 0,  0,  1, 0},  // Poly63
-		{0x03, 0x06, 0xffffffff, 0,  0,  3, 0},  // PolyV54
 
-		{0x00, 0x00, 0xffffffff, 0,  0,  0, 0x00000001},  // AIS, All-1's
-		{0x00, 0x00, 0xfffffffe, 0,  0,  0, 0x00000000},  // A0S
-		{0x00, 0x01, 0xfffffffe, 0,  0,  0, 0x00000001},  // Alt
+		{0x00, 0x00, 0xffffffff, 0,  0,  0, 0x00000001},  // All-1's
+		{0x00, 0x00, 0xfffffffe, 0,  0,  0, 0x00000000},  // All-0's
+		{0x00, 0x01, 0xfffffffe, 0,  0,  0, 0x00000001},  // Alt 1:1
 		{0x00, 0x17, 0xff200022, 0,  0,  0, 0x00440004},  // 3in24
 		{0x00, 0x07, 0xffffff40, 0,  0,  0, 0x00000040},  // 1in8 (1:7)
 		{0x00, 0x07, 0xffffff42, 0,  0,  0, 0x00000042},  // 2in8
 
 		{0x00, 0x05, 0xffffff10, 0,  0,  0, 0x00000010},  // 1in5
-		{0x00, 0x06, 0xffffff20, 0,  0,  0, 0x00000020}   // 1in6
+		{0x00, 0x06, 0xffffff20, 0,  0,  0, 0x00000020},  // 1in6
+		{0x03, 0x06, 0xffffffff, 0,  0,  3, 0}  		  // PolyV54
 	};
 
 // Write registers to select a test pattern
@@ -65,6 +66,7 @@ void set_test_pattern() {
 	IOWR_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_CTL, temp);
 
 	load_test_pattern();
+	start_BERT_test();
 }
 
 void Invert_BERT_pattern()
@@ -96,17 +98,33 @@ void Insert_BERT_biterror()
 	transition_register_bit(ADDR_FRC_ERR, FRC_SBE_MASK);
 }
 
+void latch_BERT_counts()
+{
+	transition_register_bit(ADDR_CTL, CTL_LC_MASK);
+}
+
+unsigned long get_BERT_rcv_pattern()
+{
+	unsigned long prrdata;
+	transition_register_bit(ADDR_CTL, CTL_RL_MASK);
+
+	prrdata = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_PRR);
+	D(1, BUG("\nBERT PRR: %0lX\n", prrdata));
+	//return (IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_PRR));
+	return prrdata;
+}
+
 void read_C3794_BERT_counts()
 {
 	unsigned long long bit_count_reg;
 	unsigned int bit_error_count_reg;
 
-	transition_register_bit(ADDR_CTL, CTL_LC_MASK);
+	latch_BERT_counts();
 	bit_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_H);
 	bit_count_reg = (bit_count_reg << 32);
 	bit_count_reg += IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_COUNT_L);
 	bit_error_count_reg = IORD_32DIRECT(TOP_C37DOT94_0_BASE, ADDR_BIT_ERROR_COUNT);
-    D(-1, BUG("Bit count: %llu, Bit error count: %u, BER: %4.3e\n", bit_count_reg, bit_error_count_reg, (bit_error_count_reg/(double)bit_count_reg)));
+    D(1, BUG("Bit count: %llu, Bit error count: %u, BER: %4.3e\n", bit_count_reg, bit_error_count_reg, (bit_error_count_reg/(double)bit_count_reg)));
 }
 
 void load_test_pattern()
@@ -139,29 +157,74 @@ void stop_BERT_test()
 /*********************************************************/
 void restart_bert()
 {
-	transition_register_bit(ADDR_CTL, CTL_LC_MASK); // pulse to latch counts
+	latch_BERT_counts();
 
 	SaveBytesLong(ConfigStatC37,BECR3_ptr,0);			// Clear BERT Counters
 	SaveBytesInt(ConfigStatC37,BERT_ES1_ptr,0);
 	SaveBytesInt(ConfigStatC37,BERT_SES1_ptr,0);
+
+	//BERT_STATE &= ~0xC0;	// clear Sync state machine
 }
 
-/***
+
 //********************************************************************************
 //   BERT_STATE
- *   0x00: NO SYNC
- *   0x80: PAT SYNC  (1st SYNC)
- *   0x40: SYNC LOSS (Lost SYNC)
- *   0xC0: PAT LOST  (2nd SYNC - PAT reSYNC'd
- *
- * ConfigStatC37[BSR_ptr] = BERT_STATE;
+//*   0x00: NO SYNC
+//*   0x80: PAT SYNC  (1st SYNC)
+//*   0x40: SYNC LOSS (Lost SYNC)
+//*   0xC0: PAT LOST  (2nd SYNC - PAT reSYNC'd
+//*
+//* ConfigStatC37[BSR_ptr] = BERT_STATE;
 
 //**** ^7=IN-SYNC (1=InSYNC),  ^6=2+SYNC: (0=1stSYNC,1=subsequentSYNC)
 //*** gPatSync	(gStatus[BSR_ptr]&0xC0)	*******	if !([BSR_ptr]&0x80) is NO SYNC
 //												if [BSR_ptr]&0xC0==0x80 is SYNC
 //												if [BSR_ptr]&0xC0==0xC0 is PatLOST
 //********************************************************************************
+void process_bert_sync()		//** BERT SYNC verification Processing **
+{
+	//update_bert_status(); PSIR may have nothing to do with BERT's !!!
 
+	//********************************************************
+	//*** Handle BERT SYNC state changes and flag GUI	 ***
+	//********************************************************************************
+	//**** ^7=IN-SYNC (1=InSYNC),  ^6=2+SYNC: (0=1stSYNC,1=subsequentSYNC)
+	//*** gPatSync	(gStatus[BSR_ptr]&0xC0)	*******	if !([BSR_ptr]&0x80) is NO SYNC
+	//												if [BSR_ptr]&0xC0==0x80 is SYNC
+	//												if [BSR_ptr]&0xC0==0xC0 is PatLOST
+	//********************************************************************************
+	//ADDR_STATUS
+	//SYNC_STATUS_OFS              4    // Pattern sync SYNCED=1, SEARCHING=0
+	//SYNC_STATUS_MASK             0x10
+	//DESYNC_STATUS_OFS            5
+	//DESYNC_STATUS_MASK           0x20
+	//********************************************************************************
+	if(BERT){ //*** if BERT is ON handle in/out sync ***
+		if(BERT_INSYNC){         //******** LOCKED ***********************************
+			if(!(BERT_STATE&0x80)){ 	// If we're not already in SYNC then...
+				BERT_STATE |= 0x80;		// Set SYNC flag.
+				D(1, BUG("\n BERT GOING into PAT_SYNC!   BERT_STATE:%0X  (0x80=SYNC,0xC0=PatLOST)",BERT_STATE));
+				restart_bert();			// Reset all BERT Counters
+				}
+			}
+		else{ //******** NOT LOCKED *******************************
+			if(BERT_STATE&0x80){      	// if we were in SYNC (or PatLOST)
+				BERT_STATE &= ~0x80;    // Clear SYNC flag.
+				BERT_STATE |= 0x40;     // flag loss of LOCK condition
+				Misc_stat37 |= 0x01;      // Send a Bleep in PDA
+				ConfigStatC37[MISC_STATC37_ptr] = Misc_stat37;
+				D(1, BUG("\n BERT Lost PAT_SYNC!  BERT_STATE:%0X  (!0x80=NOSYNC)",BERT_STATE));
+				}
+			}
+
+		ConfigStatC37[BSR_ptr] = BERT_STATE;				// pass current SYNC state
+		}// END if PRI BERT IS ON
+	//**************************************************
+	//*********** END BERT-PRI SYNC HANDLING ***********
+	//**************************************************
+}
+
+/**
 //***********************************************************************
 void process_bert_sync()		//** BERT SYNC verification Processing **
 //***********************************************************************
@@ -351,12 +414,12 @@ unsigned int i=0;
 	// set IDLE code byte to something other than default of AIS.
 	set_IDLE_code((unsigned char)0xc3);	//D(1, BUG("\n\t IDLE CODE SET\n"));  0xC3:   1100,0011
 	// set xmit and rcv channel numbers to 12
-	set_N_CHANNELS(9);  //D(1, BUG("\n\t N channels set\n"));
+	set_XMT_N_CHANNELS(9);  //D(1, BUG("\n\t N channels set\n"));
 	set_RCV_N_CHANNELS(9);   //D(1, BUG("\n\t N RCV channels set\n"));
 
 	// wait for receive clock to lock, and good framing pattern to be found
-	wait_for_rcv_clock_locked();  //D(-1, BUG("\n\t RCV clock locked\n"));
-	wait_for_LOS_GOOD();    //D(1, BUG("\n\t LOS GOOD\n"));
+	wait_for_rcv_clock_locked();  //D(1, BUG("\n\t RCV clock locked\n"));
+	wait_for_FrameSync();    //D(1, BUG("\n\t LOS GOOD\n"));
 
 	// load a test pattern via registers
 	BERT = Poly2047;
@@ -410,18 +473,18 @@ void run_C3794_BERT_test2()
 
 	unsigned short c3794_delay_cnt=0;
 
-	D(-1, BUG("\n\t	=========== C3794 BERT TEST2, applied BER: 1.0e-5 (20 second test) ======================\n"));
+	D(1, BUG("\n\t	=========== C3794 BERT TEST2, applied BER: 1.0e-5 (20 second test) ======================\n"));
 
 	set_internal_loopback();
 	// set IDLE code byte to something other than default of AIS.
 	set_IDLE_code((unsigned char)0xc3);
 	// set xmit and rcv channel numbers to 12
-	set_N_CHANNELS(1);
+	set_XMT_N_CHANNELS(1);
 	set_RCV_N_CHANNELS(1);
 
 	// wait for receive clock to lock, and good framing pattern to be found
 	wait_for_rcv_clock_locked();
-	wait_for_LOS_GOOD();
+	wait_for_FrameSync();
 
 	// load a test pattern via registers
 	BERT = ThreeIn24;
@@ -456,18 +519,18 @@ void run_C3794_BERT_test3()
 
 	unsigned short c3794_delay_cnt=0;
 
-	D(-1, BUG("\n\t	=========== C3794 BERT TEST3, Single bit error, BER: 2.64e-7 (60 second test) ======================\n"));
+	D(1, BUG("\n\t	=========== C3794 BERT TEST3, Single bit error, BER: 2.64e-7 (60 second test) ======================\n"));
 
 	set_internal_loopback();
 	// set IDLE code byte to something other than default of AIS.
 	set_IDLE_code((unsigned char)0xc3);
 	// set xmit and rcv channel numbers to 12
-	set_N_CHANNELS(6);
+	set_XMT_N_CHANNELS(6);
 	set_RCV_N_CHANNELS(6);
 
 	// wait for receive clock to lock, and good framing pattern to be found
 	wait_for_rcv_clock_locked();
-	wait_for_LOS_GOOD();
+	wait_for_FrameSync();
 
 	// load a test pattern via registers
 	BERT = ThreeIn24;

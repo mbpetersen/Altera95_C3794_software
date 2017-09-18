@@ -18,22 +18,40 @@ void read_flash_qtx_block();
 void read_flash_qtx_block_and_write_phy(); // for 10G PHY
 
 //=== C37.94 routines ======================================================
+void init_debug_test();
 void init_c37dot94();
 void verify_register(unsigned int addr, unsigned int expected, unsigned int mask);
 void transition_register_bit(unsigned int addr, unsigned int mask);
 void dump_C3794_status();
+void clear_C3794_counters();
 void set_internal_loopback();
+void clear_internal_loopback();
+void set_far_end_loopback();
+void clear_far_end_loopback();
 void set_IDLE_code(unsigned char value);
-void set_N_CHANNELS(unsigned char value);
+void set_XMT_N_CHANNELS(unsigned char value);
 void set_RCV_N_CHANNELS(unsigned char value);
 void wait_for_rcv_clock_locked();
-void wait_for_LOS_GOOD();
-void load_test_pattern();
+void wait_for_FrameSync();
 void set_test_pattern();
+void load_test_pattern();
+void start_BERT_test();
+void stop_BERT_test();
 void restart_bert();
 void Invert_BERT_pattern();
 void Insert_BERT_biterror();
 void set_C3794_BER(unsigned char BER_value);
+void config_c37_hw();
+void issue_UI_command(unsigned short msg_element, unsigned char value);
+void latch_BERT_counts();
+unsigned long get_BERT_rcv_pattern();
+void load_RCVD_FRAME();
+void update_bert_status();
+void update_alarms_event_status();
+void process_bert_sync();
+void process_bert_errors();
+void process_alarms_events();
+void update_history();
 
 void check_fixed(void);
 void reset_C3794_blocks();

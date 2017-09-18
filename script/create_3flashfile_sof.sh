@@ -13,5 +13,8 @@
 #echo Converting SOF 07170C04
 #$SOPC_KIT_NIOS2/bin/sof2flash --input="tse10G_07170C04.sof" --output="../flash/tse10G_epcs_flash_controller_0_C04.flash" --epcs 
 
-echo Converting SOF 08160C05 with PPM
-$SOPC_KIT_NIOS2/bin/sof2flash --input="tse10G_08160C05.sof" --output="../flash/tse10G_epcs_flash_controller_0_C05.flash" --epcs 
+#echo Converting SOF 08160C05 with PPM
+#$SOPC_KIT_NIOS2/bin/sof2flash --input="tse10G_08160C05.sof" --output="../flash/tse10G_epcs_flash_controller_0_C05.flash" --epcs 
+
+echo Converting SOF 08310C07 with clean PPM
+$SOPC_KIT_NIOS2/bin/sof2flash --input="tse10G_08310C07.sof" --output="../flash/tse10G_epcs_flash_controller_0_C07.flash" --epcs 

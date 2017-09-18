@@ -34,13 +34,13 @@
 //     Address range 0 to 15 
 // ___________________________________________
 #define ADDR_RUNFRAMES         0x000 // (wd add 0x0)    // Run test for this many frames
-#define ADDR_N_CHANNELS        0x004 // (wd add 0x1)    // Configure N from 1 to 12
+#define ADDR_XMT_N_CHANNELS    0x004 // (wd add 0x1)    // Configure N from 1 to 12
 #define ADDR_RCV_N_CHANNELS    0x008 // (wd add 0x2)    // Configure N from 1 to 12
 
 #define ADDR_MATCH 0x00c // (wd add 0x03  def=0x24
 //    Bit.7:SyncIntr, Bit.6:DeSyncIntr, Bit.5:AutoResync, Bit.43210:desync level
 //    def:      0            0                 1              0x04
-// Match settings register
+// Match settings register (assume all for BERT PAT)  ?????????
 #define MATCH_DESYNC_LEVEL_OFS               0
 #define MATCH_DESYNC_LEVEL_MASK              0x1f
 #define MATCH_DESYNC_LEVEL_SIZE              5
@@ -64,7 +64,12 @@
 #define CTL_STOP_MASK                      0x02
 #define CTL_RESYNC_OFS                     2
 #define CTL_RESYNC_MASK                    0x4
-// following bits taken from D2172 EIR
+//is RESYNC== DS2172 RESYNC PCR.1??   Initiate Manual Resync Process. A low to high transition will force the
+//	DS2172 to resynchronize to the incoming pattern at RDATA. Must be
+//	cleared and set again for a subsequent resync.
+// OR is this Force resync of FRAME?
+
+// some of the following bits taken from D2172
 #define CTL_RL_OFS                         3 // Latch data into PRR
 #define CTL_RL_MASK                        0x08
 #define CTL_LC_OFS                         4 // Latch Bit and Bit Error count values
@@ -76,6 +81,8 @@
 #define CTL_QRSS_MASK                      0x40
 #define CTL_TL_OFS                         7 // Load pattern generator
 #define CTL_TL_MASK                        0x80
+#define CTL_RWLB_OFS                   		8 // Receive Frame(s) window latch bit (control register, self clearing)
+#define CTL_RWLB_MASK                   	0x100
 
 
 #define ADDR_DEBUG 0x020 // (wd add 0x8)    // control loopback, continuous/limited run
@@ -126,14 +133,15 @@
 #define FRC_XMIT_JITTER_OFS          0  // Set transmit jitter in clock increments
 #define FRC_XMIT_JITTER_SIZE         4  // Valid range 0 - 13(~100ns).
 #define FRC_XMIT_MASTER_OFS          5  // Set transmitter as Master,
-// no phase adjustment
+
+//currently 8 bits of status
 #define ADDR_STATUS            0x030 // (wd add 0xc)    // Collection of status bits:
 #define TEST_STATUS_OFS              0    // Test status ACTIVE=1,STANDBY=0
 #define TEST_STATUS_MASK             0x1 
 #define CLOCK_STATUS_OFS             1    // Receive clock LOCKED=1,UNLOCKED=0
 #define CLOCK_STATUS_MASK            0x2  
-#define LOS_STATUS_OFS               2    // LOS_INACTIVE=1, LOS_ACTIVE=0
-#define LOS_STATUS_MASK              0x4   
+#define LOF_STATUS_OFS               2    // LOF_INACTIVE=1, LOF_ACTIVE=0
+#define LOF_STATUS_MASK              0x4   
 #define RDI_STATUS_OFS               3    // RDI_INACTIVE=1, RDI_ACTIVE=0
 #define RDI_STATUS_MASK              0x8    
 #define SYNC_STATUS_OFS              4    // Pattern sync SYNCED=1, SEARCHING=0
@@ -143,9 +151,9 @@
 #define DESYNC_STATUS_MASK           0x20
 #define UNLOCKED                     0
 #define LOCKED                       1
-#define LOS_ACTIVE                   0
-#define LOS_INACTIVE                 1
-#define RDI_ACTIVE                   0
+#define LOF_ACTIVE_STATE             0
+#define LOF_INACTIVE                 1
+#define RDI_ACTIVE_STATE             0
 #define RDI_INACTIVE                 1
 #define SEARCHING                    0
 #define SYNCED                       1
@@ -154,12 +162,12 @@
 //     Status counters (R/clear on Write)
 //     Address range 16 to 21
 // ___________________________________________
-#define ADDR_LOS_DETECT    0x040 // (wd add 0x10)    // Number of times Loss of Signal condition detected
-#define ADDR_LOS_ACTIVE    0x044 // (wd add 0x11)    // Number of frames where LOS is active
-#define ADDR_RDI_DETECT    0x048 // (wd add 0x12)    // Number of times Remote Defect Indication condition detected
-#define ADDR_RDI_ACTIVE    0x04c // (wd add 0x13)    // Number of frames where RDI is active
-#define ADDR_FRAMES_RX     0x050 // (wd add 0x14)    // Number of frames received during active tests
-#define ADDR_FRAMES_TX     0x054 // (wd add 0x15)    // Number of frames transmitted during active tests
+#define ADDR_LOF_DETECT_CNT    		0x040 // (wd add 0x10)    // Number of times Loss of FRAME condition detected
+#define ADDR_LOF_NUMFRMS_ACTIVE    	0x044 // (wd add 0x11)    // Number of frames where LOF is active
+#define ADDR_RDI_DETECT_CNT    		0x048 // (wd add 0x12)    // Number of times Remote Defect Indication condition detected
+#define ADDR_RDI_NUMFRMS_ACTIVE    	0x04c // (wd add 0x13)    // Number of frames where RDI is active
+#define ADDR_NUM_FRAMES_RX     		0x050 // (wd add 0x14)    // Number of frames received during active tests
+#define ADDR_NUM_FRAMES_TX     		0x054 // (wd add 0x15)    // Number of frames transmitted during active tests
 
 // ___________________________________________
 //     Clock control address parameters (R/W)
@@ -188,10 +196,22 @@
 //     BERT Status registers
 //     Address range 27 to 29
 // ___________________________________________
-#define ADDR_PSIR                   0x06c // (wd add 0x1b)    // Pattern Sync Info Register
-#define ADDR_PRR                    0x070 // (wd add 0x1c)    // Pattern Receive Register
+#define ADDR_PSIR                   0x06c // (wd add 0x1b)    // Pattern Status Info Register (updated on it's own)
+#define ADDR_PRR                    0x070 // (wd add 0x1c)    // Pattern Receive Register (LtoH on RL PCR.3 to latch)
 #define ADDR_PER                    0x074 // (wd add 0x1d)    // Pattern Error Register
 
+//__PSIR definitions:  "DS2172" equivalent BERT status register____________
+//***** NOT IMPLEMENTED **********
+//#define SYNC	(BERT_STATUS&0x01)	//Real time status of the synchronizer (this bit is not latched). Will be set when synchronization is declared.
+//									//   Will be cleared when 6 or more bits out of 64 are received in error (if PCR.2 = 0).
+////BECOF SR.1 Bit Error Count Overflow. Set when the 32-bit BECR overflows.
+////BCOF SR.2 Bit Counter Overflow. Set when the 32-bit BCR overflows.
+////BED SR.3 Bit Error Detection. Set when bit errors are detected.
+//#define RLOS	(BERT_STATUS&0x10)	//Receive Loss Of Sync. Set when the device is searching for synchronization. Once sync is achieved, will remain set until read.
+//#define RALL0	(BERT_STATUS&0x20)	//Receive All Zeros. Set when 32 consecutive 0s are received; allowed to be cleared when a 1 is received.
+//#define RALL1	(BERT_STATUS&0x40)	//Receive All Ones. Set when 32 consecutive 1s are received; allowed to be cleared when a 0 is received.
+//#define RA1A0	(BERT_STATUS&0x60)	// receive either All1's or All0's
+////- SR.7 Not Assigned. Could be any value when read.
 // ___________________________________________
 //     Overall error counters. (R/Clear on write)
 //     Address range 30 to 31
@@ -239,16 +259,15 @@
 //#define ADDR_CMPLMNT_ERR_FRAMES               0x0fc // (wd add 0x3f)    // Number of frames with any complement bit errors
 
 // ___________________________________________
-#define CTL_RWLB_OFS                   	8 // Receive window latch bit (control register, self clearing)
-#define CTL_RWLB_MASK                   0x100
-
+#define ADDR_RCV_WINDOW_BASE            0x100
+//#define CTL_RWLB_OFS                   	8 // Receive window latch bit (control register, self clearing)
+//#define CTL_RWLB_MASK                   0x100
 #define RCV_WINDOW_WORD_SIZE            32   // 32 bit words are read from the receive window (msb is first bit received, lsb last)
 #define RCV_WINDOW_FRAME_WORDS          8 	 // 8 32 bit words per frame in the receive window (lowest address is first word received, highest last)
 #define RCV_WINDOW_NUM_FRAMES           2    // 2 frames in the receive window, order not guaranteed
 #define RCV_WINDOW_ADDRESS_RANGE        16   // 512 bits of stuff here total
 #define RCV_WINDOW_ADDRESS_RANGE_LOG2   4
 
-#define ADDR_RCV_WINDOW_BASE            0x100
 
 
 #endif /* C3794_DEF_H */
